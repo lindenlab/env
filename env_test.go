@@ -1,4 +1,4 @@
-package env
+ package env
 
 import (
 	"errors"
@@ -121,6 +121,16 @@ func TestParsesEnv(t *testing.T) {
 	assert.Equal(t, time.Minute, cfg.UnmarshalerPtr.Duration)
 	assert.Equal(t, []unmarshaler{unmarshaler{time.Minute * 2}, unmarshaler{time.Minute * 3}}, cfg.Unmarshalers)
 	assert.Equal(t, []*unmarshaler{&unmarshaler{time.Minute * 2}, &unmarshaler{time.Minute * 3}}, cfg.UnmarshalerPtrs)
+}
+
+func TestParseWithPrefix(t *testing.T) {
+	os.Setenv("FOO_PORT", "1234")
+	os.Setenv("FOO_STRINGS", "string1,string2,string3")
+
+	cfg := Config{}
+	assert.NoError(t, ParseWithPrefix(&cfg, "FOO_"))
+	assert.Equal(t, 1234, cfg.Port)
+	assert.Equal(t, []string{"string1", "string2", "string3"}, cfg.Strings)
 }
 
 func TestParsesEnvInner(t *testing.T) {
