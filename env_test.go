@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"strconv"
@@ -53,6 +54,8 @@ type Config struct {
 	UnmarshalerPtr  *unmarshaler    `env:"UNMARSHALER_PTR"`
 	Unmarshalers    []unmarshaler   `env:"UNMARSHALERS"`
 	UnmarshalerPtrs []*unmarshaler  `env:"UNMARSHALER_PTRS"`
+	URL 			url.URL  		`env:"URL"`
+	URLs 			[]url.URL  		`env:"URLS"`
 }
 
 type ParentStruct struct {
@@ -89,6 +92,8 @@ func TestParsesEnv(t *testing.T) {
 	os.Setenv("UNMARSHALER_PTR", "1m")
 	os.Setenv("UNMARSHALERS", "2m,3m")
 	os.Setenv("UNMARSHALER_PTRS", "2m,3m")
+	os.Setenv("URL", "http://google.com")
+	os.Setenv("URLS", "ftp://foo.com:23,https://cat.com")
 
 	defer os.Clearenv()
 
@@ -121,6 +126,10 @@ func TestParsesEnv(t *testing.T) {
 	assert.Equal(t, time.Minute, cfg.UnmarshalerPtr.Duration)
 	assert.Equal(t, []unmarshaler{unmarshaler{time.Minute * 2}, unmarshaler{time.Minute * 3}}, cfg.Unmarshalers)
 	assert.Equal(t, []*unmarshaler{&unmarshaler{time.Minute * 2}, &unmarshaler{time.Minute * 3}}, cfg.UnmarshalerPtrs)
+	assert.Equal(t, "google.com", cfg.URL.Host)
+	assert.Equal(t, "ftp", cfg.URLs[0].Scheme)
+	assert.Equal(t, "23", cfg.URLs[0].Port())
+	assert.Equal(t, "cat.com", cfg.URLs[1].Host)
 }
 
 func TestParseWithPrefix(t *testing.T) {

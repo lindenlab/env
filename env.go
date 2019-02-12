@@ -217,6 +217,7 @@ func set(field reflect.Value, refType reflect.StructField, value string, funcMap
 			return fmt.Errorf("Unable to complete URL parse: %v", err)
 		}
 		field.Set(reflect.ValueOf(*u))
+		return nil
 	}
 
 	// fall back to built-in parsers

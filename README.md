@@ -56,22 +56,22 @@ basic validations on envirnment varaibles.
 
 The library has built-in support for the following types:
 
-string
-int
-uint
-int64
-bool
-float32
-float64
-time.Duration
-url.URL
-[]string
-[]int
-[]bool
-[]float32
-[]float64
-[]time.Duration
-[]url.URL
+* `string`
+* `int`
+* `uint`
+* `int64`
+* `bool`
+* `float32`
+* `float64`
+* `time.Duration`
+* `url.URL`
+* `[]string`
+* `[]int`
+* `[]bool`
+* `[]float32`
+* `[]float64`
+* `[]time.Duration`
+* `[]url.URL`
 
 ### Optional tags
 
