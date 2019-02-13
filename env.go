@@ -168,7 +168,7 @@ func get(field reflect.StructField, prefix string) (string, error) {
 			case "":
 				break
 			case "required":
-				val, err = getRequired(key)
+				val, err = getRequired(key, prefix)
 			default:
 				err = fmt.Errorf("env tag option %q not supported", opt)
 			}
@@ -184,8 +184,8 @@ func parseKeyForOption(key string) (string, []string) {
 	return opts[0], opts[1:]
 }
 
-func getRequired(key string) (string, error) {
-	if value, ok := os.LookupEnv(key); ok {
+func getRequired(key, prefix string) (string, error) {
+	if value, ok := os.LookupEnv(prefix + key); ok {
 		return value, nil
 	}
 	return "", fmt.Errorf("required environment variable %q is not set", key)

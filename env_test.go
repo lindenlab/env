@@ -374,6 +374,20 @@ func TestNoErrorRequiredSet(t *testing.T) {
 	assert.Equal(t, "val", cfg.IsRequired)
 }
 
+func TestNoErrorRequiredSetWithPrefix(t *testing.T) {
+	type config struct {
+		IsRequired string `env:"IS_REQUIRED,required"`
+	}
+
+	cfg := &config{}
+
+	os.Setenv("CLIENT_IS_REQUIRED", "val")
+	defer os.Clearenv()
+	assert.NoError(t, ParseWithPrefix(cfg, "CLIENT_"))
+	assert.Equal(t, "val", cfg.IsRequired)
+}
+
+
 func TestErrorRequiredNotSet(t *testing.T) {
 	type config struct {
 		IsRequired string `env:"IS_REQUIRED,required"`
