@@ -41,7 +41,6 @@ type CustomParsers map[reflect.Type]ParserFunc
 // ParserFunc defines the signature of a function that can be used within `CustomParsers`
 type ParserFunc func(v string) (interface{}, error)
 
-
 // Set - sets an environment variable
 func Set(key, value string) error {
 	return os.Setenv(key, value)
@@ -57,7 +56,6 @@ func Get(key string) string {
 	return os.Getenv(key)
 }
 
-
 // GetOr - get an environment variable or return default value if does not exist
 func GetOr(key, defaultValue string) string {
 	value, ok := os.LookupEnv(key)
@@ -68,7 +66,7 @@ func GetOr(key, defaultValue string) string {
 }
 
 // MustGet - get an environment variable or panic if does not exist
-func MustGet(key) string {
+func MustGet(key string) string {
 	value, ok := os.LookupEnv(key)
 	if ok {
 		return value
@@ -76,17 +74,16 @@ func MustGet(key) string {
 	panic(fmt.Sprintf("expected environment variable \"%s\" does not exist", key))
 }
 
-
 // Parse parses a struct containing `env` tags and loads its values from
 // environment variables.
 func Parse(v interface{}) error {
-	return ParseWithPrefixFuncs(v, "", make(map[reflect.Type]ParserFunc, 0))
+	return ParseWithPrefixFuncs(v, "", make(map[reflect.Type]ParserFunc))
 }
 
 // ParseWithPrefix parses a struct containing `env` tags and loads its values from
 // environment variables.  The actual env vars looked up include the passed in prefix.
 func ParseWithPrefix(v interface{}, prefix string) error {
-	return ParseWithPrefixFuncs(v, prefix, make(map[reflect.Type]ParserFunc, 0))
+	return ParseWithPrefixFuncs(v, prefix, make(map[reflect.Type]ParserFunc))
 }
 
 // ParseWithFuncs is the same as `Parse` except it also allows the user to pass

@@ -1,4 +1,4 @@
- package env
+package env
 
 import (
 	"errors"
@@ -54,8 +54,8 @@ type Config struct {
 	UnmarshalerPtr  *unmarshaler    `env:"UNMARSHALER_PTR"`
 	Unmarshalers    []unmarshaler   `env:"UNMARSHALERS"`
 	UnmarshalerPtrs []*unmarshaler  `env:"UNMARSHALER_PTRS"`
-	URL 			url.URL  		`env:"URL"`
-	URLs 			[]url.URL  		`env:"URLS"`
+	URL             url.URL         `env:"URL"`
+	URLs            []url.URL       `env:"URLS"`
 }
 
 type ParentStruct struct {
@@ -124,8 +124,8 @@ func TestParsesEnv(t *testing.T) {
 	assert.Equal(t, []time.Duration{d1, d2, d3}, cfg.Durations)
 	assert.Equal(t, time.Second, cfg.Unmarshaler.Duration)
 	assert.Equal(t, time.Minute, cfg.UnmarshalerPtr.Duration)
-	assert.Equal(t, []unmarshaler{unmarshaler{time.Minute * 2}, unmarshaler{time.Minute * 3}}, cfg.Unmarshalers)
-	assert.Equal(t, []*unmarshaler{&unmarshaler{time.Minute * 2}, &unmarshaler{time.Minute * 3}}, cfg.UnmarshalerPtrs)
+	assert.Equal(t, []unmarshaler{{time.Minute * 2}, {time.Minute * 3}}, cfg.Unmarshalers)
+	assert.Equal(t, []*unmarshaler{{time.Minute * 2}, {time.Minute * 3}}, cfg.UnmarshalerPtrs)
 	assert.Equal(t, "google.com", cfg.URL.Host)
 	assert.Equal(t, "ftp", cfg.URLs[0].Scheme)
 	assert.Equal(t, "23", cfg.URLs[0].Port())
@@ -386,7 +386,6 @@ func TestNoErrorRequiredSetWithPrefix(t *testing.T) {
 	assert.NoError(t, ParseWithPrefix(cfg, "CLIENT_"))
 	assert.Equal(t, "val", cfg.IsRequired)
 }
-
 
 func TestErrorRequiredNotSet(t *testing.T) {
 	type config struct {
@@ -672,35 +671,7 @@ func ExampleParse() {
 	}
 	os.Setenv("HOME", "/tmp/fakehome")
 	cfg := config{}
-	Parse(&cfg)
+	_ = Parse(&cfg)
 	fmt.Println(cfg)
 	// Output: {/tmp/fakehome 3000 false}
-}
-
-func ExampleParseRequiredField() {
-	type config struct {
-		Home         string `env:"HOME"`
-		Port         int    `env:"PORT" envDefault:"3000"`
-		IsProduction bool   `env:"PRODUCTION"`
-		SecretKey    string `env:"SECRET_KEY,required"`
-	}
-	os.Setenv("HOME", "/tmp/fakehome")
-	cfg := config{}
-	err := Parse(&cfg)
-	fmt.Println(err)
-	// Output: required environment variable "SECRET_KEY" is not set
-}
-
-func ExampleParseMultipleOptions() {
-	type config struct {
-		Home         string `env:"HOME"`
-		Port         int    `env:"PORT" envDefault:"3000"`
-		IsProduction bool   `env:"PRODUCTION"`
-		SecretKey    string `env:"SECRET_KEY,required,option1"`
-	}
-	os.Setenv("HOME", "/tmp/fakehome")
-	cfg := config{}
-	err := Parse(&cfg)
-	fmt.Println(err)
-	// Output: env tag option "option1" not supported
 }
