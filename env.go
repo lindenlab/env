@@ -68,7 +68,7 @@ func GetOr(key, defaultValue string) string {
 }
 
 // MustGet - get an environment variable or panic if does not exist
-func MustGet(key, defaultValue string) string {
+func MustGet(key) string {
 	value, ok := os.LookupEnv(key)
 	if ok {
 		return value
