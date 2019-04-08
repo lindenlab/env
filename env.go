@@ -143,57 +143,39 @@ func doParse(ref reflect.Value, prefix string, funcMap CustomParsers) error {
 }
 
 func get(field reflect.StructField, prefix string) (string, error) {
-	var (
-		val string
-		err error
-	)
+	key := prefix + field.Tag.Get("env")
 
-	key, opts := parseKeyForOption(field.Tag.Get("env"))
-
-	defaultValue := field.Tag.Get("envDefault")
-	val = getOrWithPrefix(key, prefix, defaultValue)
-
-	expandVar := field.Tag.Get("envExpand")
-	if strings.ToLower(expandVar) == "true" {
-		val = os.ExpandEnv(val)
-	}
-
-	if len(opts) > 0 {
-		for _, opt := range opts {
-			// The only option supported is "required".
-			switch opt {
-			case "":
-				break
-			case "required":
-				val, err = getRequired(key, prefix)
-			default:
-				err = fmt.Errorf("env tag option %q not supported", opt)
-			}
+	var envRequired = false
+	reqTag, hasRequiredTag := field.Tag.Lookup("required")
+	if hasRequiredTag {
+		var b bool
+		var err error
+		if b, err = strconv.ParseBool(reqTag); err != nil {
+			// The value provided for the required tag is not a valid
+			// Boolean, so inform the user.
+			return "", fmt.Errorf("invalid required tag %q: %v", reqTag, err)
+		}
+		if b {
+			envRequired = true
 		}
 	}
 
-	return val, err
-}
-
-// split the env tag's key into the expected key and desired option, if any.
-func parseKeyForOption(key string) (string, []string) {
-	opts := strings.Split(key, ",")
-	return opts[0], opts[1:]
-}
-
-func getRequired(key, prefix string) (string, error) {
-	if value, ok := os.LookupEnv(prefix + key); ok {
-		return value, nil
+	value, envFound := os.LookupEnv(key)
+	if !envFound && envRequired {
+		return "", fmt.Errorf("env var %s was missing and is required", key)
 	}
-	return "", fmt.Errorf("required environment variable %q is not set", key)
-}
 
-func getOrWithPrefix(key, prefix, defaultValue string) string {
-	value, ok := os.LookupEnv(prefix + key)
-	if ok {
-		return value
+	if !envFound {
+		// apply default if one exists
+		value = field.Tag.Get("envDefault")
 	}
-	return defaultValue
+
+	expandVar := field.Tag.Get("envExpand")
+	if strings.ToLower(expandVar) == "true" {
+		value = os.ExpandEnv(value)
+	}
+
+	return value, nil
 }
 
 func set(field reflect.Value, refType reflect.StructField, value string, funcMap CustomParsers) error {

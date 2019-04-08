@@ -363,7 +363,7 @@ func TestBadSeparator(t *testing.T) {
 
 func TestNoErrorRequiredSet(t *testing.T) {
 	type config struct {
-		IsRequired string `env:"IS_REQUIRED,required"`
+		IsRequired string `env:"IS_REQUIRED" required:"true"`
 	}
 
 	cfg := &config{}
@@ -376,24 +376,44 @@ func TestNoErrorRequiredSet(t *testing.T) {
 
 func TestNoErrorRequiredSetWithPrefix(t *testing.T) {
 	type config struct {
-		IsRequired string `env:"IS_REQUIRED,required"`
+		IsRequired string `env:"IS_REQUIRED" required:"true"`
 	}
 
 	cfg := &config{}
 
-	os.Setenv("CLIENT_IS_REQUIRED", "val")
+	os.Setenv("MYCLIENT_IS_REQUIRED", "val")
 	defer os.Clearenv()
-	assert.NoError(t, ParseWithPrefix(cfg, "CLIENT_"))
+	assert.NoError(t, ParseWithPrefix(cfg, "MYCLIENT_"))
 	assert.Equal(t, "val", cfg.IsRequired)
 }
 
 func TestErrorRequiredNotSet(t *testing.T) {
 	type config struct {
-		IsRequired string `env:"IS_REQUIRED,required"`
+		IsRequired string `env:"IS_REQUIRED" required:"True"`
 	}
 
 	cfg := &config{}
 	assert.Error(t, Parse(cfg))
+}
+
+func TestErrorRequiredNotSetWithPrefix(t *testing.T) {
+	type config struct {
+		IsRequired string `env:"IS_REQUIRED" required:"True"`
+	}
+
+	cfg := &config{}
+	assert.Error(t, ParseWithPrefix(cfg, "CLIENT_"))
+}
+
+func TestErrorRequiredNotValid(t *testing.T) {
+	type config struct {
+		IsRequired string `env:"IS_REQUIRED" required:"cat"`
+	}
+
+	cfg := &config{}
+	err := Parse(cfg)
+	assert.Error(t, err)
+	assert.Equal(t, err.Error(), "invalid required tag \"cat\": strconv.ParseBool: parsing \"cat\": invalid syntax")
 }
 
 func TestParseExpandOption(t *testing.T) {
@@ -629,29 +649,6 @@ func TestUnsupportedStructType(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Equal(t, ErrUnsupportedType, err)
-}
-
-func TestEmptyOption(t *testing.T) {
-	type config struct {
-		Var string `env:"VAR,"`
-	}
-
-	cfg := &config{}
-
-	os.Setenv("VAR", "val")
-	defer os.Clearenv()
-	assert.NoError(t, Parse(cfg))
-	assert.Equal(t, "val", cfg.Var)
-}
-
-func TestErrorOptionNotRecognized(t *testing.T) {
-	type config struct {
-		Var string `env:"VAR,not_supported!"`
-	}
-
-	cfg := &config{}
-	assert.Error(t, Parse(cfg))
-
 }
 
 func TestTextUnmarshalerError(t *testing.T) {

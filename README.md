@@ -23,7 +23,7 @@ values from the environment.
 Take the following example:
 ```
 type ClientConfig struct {
-	Endpoint                  []string      `env:"ENDPOINT,required"`
+	Endpoint                  []string      `env:"ENDPOINT" required:"true"`
 	HealthCheck               bool          `env:"HEALTH_CHECK" envDefault:"true"`
 	HealthCheckTimeout        time.Duration `env:"HEALTH_CHECK_TIMEOUT" envDefault:"1s"`
 }
@@ -76,7 +76,7 @@ The library has built-in support for the following types:
 ### Optional tags
 
 The required tag will cause an error if the environment variable does not exist:
-``` `env:"ENDPOINT,required"` ```
+``` `env:"ENDPOINT" required:"true"` ```
 
 The envDefault tag will allow you to provide a default value to use if the environment variable does not exist:
 ``` `env:"HEALTH_CHECK" envDefault:"true"` ```
