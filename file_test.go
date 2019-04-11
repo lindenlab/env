@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var noopPresets = make(map[string]string)
@@ -61,6 +63,8 @@ func TestLoadFileNotFound(t *testing.T) {
 	if err == nil {
 		t.Error("File wasn't found but Load didn't return an error")
 	}
+
+  	assert.Panics(t, func() { MustLoad("somefilethatwillneverexistever.env") }, "The code did not panic")
 }
 
 func TestOverloadFileNotFound(t *testing.T) {
@@ -68,6 +72,8 @@ func TestOverloadFileNotFound(t *testing.T) {
 	if err == nil {
 		t.Error("File wasn't found but Overload didn't return an error")
 	}
+
+  	assert.Panics(t, func() { MustOverload("somefilethatwillneverexistever.env") }, "The code did not panic")
 }
 
 func TestReadPlainEnv(t *testing.T) {

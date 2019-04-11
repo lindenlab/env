@@ -49,7 +49,7 @@ func GetOrBool(key string, defaultValue bool) bool {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
 		value, err := strconv.ParseBool(strValue)
-		if err != nil {
+		if err == nil {
 			return value
 		}
 	}
@@ -61,7 +61,7 @@ func MustGetBool(key string) bool {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
 		value, err := strconv.ParseBool(strValue)
-		if err != nil {
+		if err == nil {
 			return value
 		} else {
 			panic(fmt.Sprintf("environment variable \"%s\" could not be convert to boolean", key))
@@ -81,7 +81,7 @@ func GetOrInt(key string, defaultValue int) int {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
 		value, err := strconv.ParseInt(strValue, 10, 32)
-		if err != nil {
+		if err == nil {
 			return int(value)
 		}
 	}
@@ -93,7 +93,7 @@ func MustGetInt(key string) int {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
 		value, err := strconv.ParseInt(strValue, 10, 32)
-		if err != nil {
+		if err == nil {
 			return int(value)
 		} else {
 			panic(fmt.Sprintf("environment variable \"%s\" could not be convert to int", key))
@@ -113,7 +113,7 @@ func GetOrUint(key string, defaultValue uint) uint {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
 		value, err := strconv.ParseUint(strValue, 10, 32)
-		if err != nil {
+		if err == nil {
 			return uint(value)
 		}
 	}
@@ -125,7 +125,7 @@ func MustGetUint(key string) uint {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
 		value, err := strconv.ParseUint(strValue, 10, 32)
-		if err != nil {
+		if err == nil {
 			return uint(value)
 		} else {
 			panic(fmt.Sprintf("environment variable \"%s\" could not be convert to uint", key))
@@ -135,17 +135,17 @@ func MustGetUint(key string) uint {
 }
 
 // GetFloat - get an environment variable as float32
-func GetFloat(key string) (float32, error) {
+func GetFloat32(key string) (float32, error) {
 	value, err := strconv.ParseFloat(os.Getenv(key), 32)
 	return float32(value), err
 }
 
 // GetOrFloat - get an environment variable or return default value if does not exist
-func GetOrFloat(key string, defaultValue float32) float32 {
+func GetOrFloat32(key string, defaultValue float32) float32 {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
 		value, err := strconv.ParseFloat(strValue, 32)
-		if err != nil {
+		if err == nil {
 			return float32(value)
 		}
 	}
@@ -153,11 +153,11 @@ func GetOrFloat(key string, defaultValue float32) float32 {
 }
 
 // MustGetUFloat - get an environment variable or panic if does not exist
-func MustGetFloat(key string) float32 {
+func MustGetFloat32(key string) float32 {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
 		value, err := strconv.ParseFloat(strValue, 32)
-		if err != nil {
+		if err == nil {
 			return float32(value)
 		} else {
 			panic(fmt.Sprintf("environment variable \"%s\" could not be convert to float32", key))

@@ -21,7 +21,7 @@ const doubleQuoteSpecialChars = "\\\n\r\"!$`"
 //
 // You can otherwise tell it which files to load (there can be more than one) like
 //
-//		env.Load("fileone", "filetwo")
+//		err := env.Load("fileone", "filetwo")
 //
 // It's important to note that it WILL NOT OVERRIDE an env variable that already exists - consider the .env file to set dev vars or sensible defaults
 func Load(filenames ...string) (err error) {
@@ -36,6 +36,30 @@ func Load(filenames ...string) (err error) {
 	return
 }
 
+// MustLoad will read your env file(s) and load them into ENV for this process.
+//
+// Call this function as close as possible to the start of your program (ideally in main)
+//
+// If you call Load without any args it will default to loading .env in the current path.
+// If there are any errors the function will panic.
+//
+// You can otherwise tell it which files to load (there can be more than one) like
+//
+//		env.MustLoad("fileone", "filetwo")
+//
+// It's important to note that it WILL NOT OVERRIDE an env variable that already exists - consider the .env file to set dev vars or sensible defaults
+func MustLoad(filenames ...string) {
+	filenames = filenamesOrDefault(filenames)
+
+	for _, filename := range filenames {
+		err := loadFile(filename, false)
+		if err != nil {
+			panic(err)
+		}
+	}
+	return
+}
+
 // Overload will read your env file(s) and load them into ENV for this process.
 //
 // Call this function as close as possible to the start of your program (ideally in main)
@@ -44,7 +68,7 @@ func Load(filenames ...string) (err error) {
 //
 // You can otherwise tell it which files to load (there can be more than one) like
 //
-//		env.Overload("fileone", "filetwo")
+//		err := env.Overload("fileone", "filetwo")
 //
 // It's important to note this WILL OVERRIDE an env variable that already exists - consider the .env file to forcefilly set all vars.
 func Overload(filenames ...string) (err error) {
@@ -54,6 +78,29 @@ func Overload(filenames ...string) (err error) {
 		err = loadFile(filename, true)
 		if err != nil {
 			return // return early on a spazout
+		}
+	}
+	return
+}
+
+// MustOverload will read your env file(s) and load them into ENV for this process.
+//
+// Call this function as close as possible to the start of your program (ideally in main)
+//
+// If you call Overload without any args it will default to loading .env in the current path
+//
+// You can otherwise tell it which files to load (there can be more than one) like
+//
+//		env.MustOverload("fileone", "filetwo")
+//
+// It's important to note this WILL OVERRIDE an env variable that already exists - consider the .env file to forcefilly set all vars.
+func MustOverload(filenames ...string) {
+	filenames = filenamesOrDefault(filenames)
+
+	for _, filename := range filenames {
+		err := loadFile(filename, true)
+		if err != nil {
+			panic(err)
 		}
 	}
 	return
