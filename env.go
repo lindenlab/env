@@ -41,39 +41,6 @@ type CustomParsers map[reflect.Type]ParserFunc
 // ParserFunc defines the signature of a function that can be used within `CustomParsers`
 type ParserFunc func(v string) (interface{}, error)
 
-// Set - sets an environment variable
-func Set(key, value string) error {
-	return os.Setenv(key, value)
-}
-
-// Unset - unsets an environment variable
-func Unset(key string) error {
-	return os.Unsetenv(key)
-}
-
-// Get - get an environment variable, empty string if does not exist
-func Get(key string) string {
-	return os.Getenv(key)
-}
-
-// GetOr - get an environment variable or return default value if does not exist
-func GetOr(key, defaultValue string) string {
-	value, ok := os.LookupEnv(key)
-	if ok {
-		return value
-	}
-	return defaultValue
-}
-
-// MustGet - get an environment variable or panic if does not exist
-func MustGet(key string) string {
-	value, ok := os.LookupEnv(key)
-	if ok {
-		return value
-	}
-	panic(fmt.Sprintf("expected environment variable \"%s\" does not exist", key))
-}
-
 // Parse parses a struct containing `env` tags and loads its values from
 // environment variables.
 func Parse(v interface{}) error {
