@@ -57,7 +57,6 @@ func MustLoad(filenames ...string) {
 			panic(err)
 		}
 	}
-	return
 }
 
 // Overload will read your env file(s) and load them into ENV for this process.
@@ -103,7 +102,6 @@ func MustOverload(filenames ...string) {
 			panic(err)
 		}
 	}
-	return
 }
 
 // Read all env (with same file loading semantics as Load) but return values as

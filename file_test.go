@@ -64,7 +64,7 @@ func TestLoadFileNotFound(t *testing.T) {
 		t.Error("File wasn't found but Load didn't return an error")
 	}
 
-  	assert.Panics(t, func() { MustLoad("somefilethatwillneverexistever.env") }, "The code did not panic")
+	assert.Panics(t, func() { MustLoad("somefilethatwillneverexistever.env") }, "The code did not panic")
 }
 
 func TestOverloadFileNotFound(t *testing.T) {
@@ -73,7 +73,7 @@ func TestOverloadFileNotFound(t *testing.T) {
 		t.Error("File wasn't found but Overload didn't return an error")
 	}
 
-  	assert.Panics(t, func() { MustOverload("somefilethatwillneverexistever.env") }, "The code did not panic")
+	assert.Panics(t, func() { MustOverload("somefilethatwillneverexistever.env") }, "The code did not panic")
 }
 
 func TestReadPlainEnv(t *testing.T) {

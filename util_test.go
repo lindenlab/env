@@ -1,11 +1,27 @@
 package env
 
 import (
-	"testing"
+	"net/url"
 	"os"
+	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestStringFuncs(t *testing.T) {
+	os.Setenv("MY_ENV", "hello")
+
+	// env exists
+	assert.Equal(t, "hello", Get("MY_ENV"))
+	assert.Equal(t, "hello", MustGet("MY_ENV"))
+	assert.Equal(t, "hello", GetOr("MY_ENV", "what up?"))
+
+	// env not exists
+	assert.Equal(t, "", Get("ENV_NO_EXISTS"))
+	assert.Equal(t, "hello world", GetOr("ENV_NO_EXISTS", "hello world"))
+	assert.Panics(t, func() { MustGet("ENV_NO_EXISTS") }, "The code did not panic")
+}
 
 func TestBoolFuncs(t *testing.T) {
 	os.Setenv("BOOL_ENV", "1")
@@ -88,7 +104,7 @@ func TestUintFuncs(t *testing.T) {
 	assert.Panics(t, func() { MustGetUint("BAD_UINT") }, "The code did not panic")
 }
 
-func TestFloatFuncs(t *testing.T) {
+func TestFloat32Funcs(t *testing.T) {
 	os.Setenv("FLOAT_ENV", "12.34")
 
 	// env exists
@@ -113,4 +129,143 @@ func TestFloatFuncs(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, float32(1.23), GetOrFloat32("BAD_FLOAT", 1.23))
 	assert.Panics(t, func() { MustGetFloat32("BAD_FLOAT") }, "The code did not panic")
+}
+
+func TestFloat64Funcs(t *testing.T) {
+	os.Setenv("FLOAT_ENV", "12.34")
+
+	// env exists
+	val, err := GetFloat64("FLOAT_ENV")
+	assert.Equal(t, float64(12.34), val)
+	assert.Nil(t, err)
+	assert.Equal(t, float64(12.34), MustGetFloat64("FLOAT_ENV"))
+	assert.Equal(t, float64(12.34), GetOrFloat64("FLOAT_ENV", 66.6))
+
+	// env not exists
+	val, err = GetFloat64("ENV_NO_EXISTS")
+	assert.Equal(t, float64(0), val)
+	assert.Error(t, err)
+	assert.Equal(t, float64(66.6), GetOrFloat64("ENV_NO_EXISTS", 66.6))
+	assert.Panics(t, func() { MustGetFloat64("ENV_NO_EXISTS") }, "The code did not panic")
+
+	// env bad format
+	os.Setenv("BAD_FLOAT", "bad_float")
+
+	val, err = GetFloat64("BAD_FLOAT")
+	assert.Equal(t, float64(0), val)
+	assert.Error(t, err)
+	assert.Equal(t, float64(1.23), GetOrFloat64("BAD_FLOAT", 1.23))
+	assert.Panics(t, func() { MustGetFloat64("BAD_FLOAT") }, "The code did not panic")
+}
+
+func TestInt64Funcs(t *testing.T) {
+	os.Setenv("INT_ENV", "-34")
+
+	// env exists
+	val, err := GetInt64("INT_ENV")
+	assert.Equal(t, int64(-34), val)
+	assert.Nil(t, err)
+	assert.Equal(t, int64(-34), MustGetInt64("INT_ENV"))
+	assert.Equal(t, int64(-34), GetOrInt64("INT_ENV", 99))
+
+	// env not exists
+	val, err = GetInt64("ENV_NO_EXISTS")
+	assert.Equal(t, int64(0), val)
+	assert.Error(t, err)
+	assert.Equal(t, int64(99), GetOrInt64("ENV_NO_EXISTS", 99))
+	assert.Panics(t, func() { MustGetInt64("ENV_NO_EXISTS") }, "The code did not panic")
+
+	// env bad format
+	os.Setenv("BAD_INT", "bad_int")
+
+	val, err = GetInt64("BAD_INT")
+	assert.Equal(t, int64(0), val)
+	assert.Error(t, err)
+	assert.Equal(t, int64(99), GetOrInt64("BAD_INT", 99))
+	assert.Panics(t, func() { MustGetInt64("BAD_INT") }, "The code did not panic")
+}
+
+func TestUint64Funcs(t *testing.T) {
+	os.Setenv("UINT_ENV", "106")
+
+	// env exists
+	val, err := GetUint64("UINT_ENV")
+	assert.Equal(t, uint64(106), val)
+	assert.Nil(t, err)
+	assert.Equal(t, uint64(106), MustGetUint64("UINT_ENV"))
+	assert.Equal(t, uint64(106), GetOrUint64("UINT_ENV", 99))
+
+	// env not exists
+	val, err = GetUint64("ENV_NO_EXISTS")
+	assert.Equal(t, uint64(0), val)
+	assert.Error(t, err)
+	assert.Equal(t, uint64(99), GetOrUint64("ENV_NO_EXISTS", 99))
+	assert.Panics(t, func() { MustGetUint64("ENV_NO_EXISTS") }, "The code did not panic")
+
+	// env bad format
+	os.Setenv("BAD_UINT", "-10")
+
+	val, err = GetUint64("BAD_UINT")
+	assert.Equal(t, uint64(0), val)
+	assert.Error(t, err)
+	assert.Equal(t, uint64(99), GetOrUint64("BAD_UINT", 99))
+	assert.Panics(t, func() { MustGetUint64("BAD_UINT") }, "The code did not panic")
+}
+
+func TestDurationFuncs(t *testing.T) {
+	os.Setenv("DURATION_ENV", "5s")
+
+	// env exists
+	val, err := GetDuration("DURATION_ENV")
+	assert.Equal(t, time.Duration(5*time.Second), val)
+	assert.Nil(t, err)
+	assert.Equal(t, time.Duration(5*time.Second), MustGetDuration("DURATION_ENV"))
+	assert.Equal(t, time.Duration(5*time.Second), GetOrDuration("DURATION_ENV", "10m"))
+
+	// env not exists
+	val, err = GetDuration("ENV_NO_EXISTS")
+	assert.Equal(t, time.Duration(0), val)
+	assert.Error(t, err)
+	assert.Equal(t, time.Duration(10*time.Minute), GetOrDuration("ENV_NO_EXISTS", "10m"))
+	assert.Panics(t, func() { MustGetDuration("ENV_NO_EXISTS") }, "The code did not panic")
+
+	assert.Panics(t, func() { GetOrDuration("ENV_NO_EXISTS", "bad_duration") }, "The code did not panic")
+
+	// env bad format
+	os.Setenv("BAD_DURATION", "cat_nip")
+
+	val, err = GetDuration("BAD_DURATION")
+	assert.Equal(t, time.Duration(0), val)
+	assert.Error(t, err)
+	assert.Equal(t, time.Duration(3*time.Hour), GetOrDuration("BAD_DURATION", "3h"))
+	assert.Panics(t, func() { MustGetDuration("BAD_DURATION") }, "The code did not panic")
+}
+
+func TestUrlFuncs(t *testing.T) {
+	os.Setenv("URL_ENV", "https://lindenlab.com/foo")
+
+	// env exists
+	val, err := GetUrl("URL_ENV")
+	assert.Equal(t, "lindenlab.com", val.Hostname())
+	assert.Nil(t, err)
+	assert.Equal(t, "lindenlab.com", MustGetUrl("URL_ENV").Hostname())
+	assert.Equal(t, "lindenlab.com", GetOrUrl("URL_ENV", "http://google.com").Hostname())
+
+	// env not exists
+	val, err = GetUrl("ENV_NO_EXISTS")
+	assert.Equal(t, (*url.URL)(nil), val)
+	assert.Error(t, err)
+	assert.Equal(t, "google.com", GetOrUrl("ENV_NO_EXISTS", "http://google.com").Hostname())
+	assert.Panics(t, func() { MustGetUrl("ENV_NO_EXISTS") }, "The code did not panic")
+
+	assert.Panics(t, func() { GetOrUrl("ENV_NO_EXISTS", "bad url") }, "The code did not panic")
+
+	// env bad format
+	os.Setenv("BAD_URL", "@@@\\foo oo:slk")
+
+	val, err = GetUrl("BAD_URL")
+	assert.Equal(t, (*url.URL)(nil), val)
+	assert.Error(t, err)
+	assert.Equal(t, "google.com", GetOrUrl("BAD_URL", "http://google.com").Hostname())
+	assert.Panics(t, func() { MustGetUrl("BAD_URL") }, "The code did not panic")
 }
