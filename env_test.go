@@ -69,6 +69,15 @@ type InnerStruct struct {
 	Number uint   `env:"innernum"`
 }
 
+type DerivedStruct struct {
+	BaseStruct
+}
+
+type BaseStruct struct {
+	Inner  string `env:"innervar"`
+	Number uint   `env:"innernum"`
+}
+
 func TestParsesEnv(t *testing.T) {
 	os.Setenv("somevar", "somevalue")
 	os.Setenv("othervar", "true")
@@ -166,6 +175,21 @@ func TestParsesEnvInnerInvalid(t *testing.T) {
 	cfg := ParentStruct{
 		InnerStruct: &InnerStruct{},
 	}
+	assert.Error(t, Parse(&cfg))
+}
+
+func TestParsesEnvDerived(t *testing.T) {
+	os.Setenv("innervar", "someinnervalue")
+	defer os.Clearenv()
+	cfg := DerivedStruct{}
+	assert.NoError(t, Parse(&cfg))
+	assert.Equal(t, "someinnervalue", cfg.Inner)
+}
+
+func TestParsesEnvDerivedInvalid(t *testing.T) {
+	os.Setenv("innernum", "-547")
+	defer os.Clearenv()
+	cfg := DerivedStruct{}
 	assert.Error(t, Parse(&cfg))
 }
 
