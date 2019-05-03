@@ -93,6 +93,11 @@ func doParse(ref reflect.Value, prefix string, funcMap CustomParsers) error {
 			continue
 		}
 		if value == "" {
+			if reflect.Struct == refField.Kind() {
+				if err := doParse(refField, prefix, funcMap); err != nil {
+					errorList = append(errorList, err.Error())
+				}
+			}
 			continue
 		}
 		if err := set(refField, refTypeField, value, funcMap); err != nil {
