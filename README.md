@@ -1,6 +1,7 @@
 # env
 
-## Credit - this repo is a heavily modified version of env by https://github.com/caarlos0 .  Also major portions we adapted from github.com/joho/godotenv.
+## Credit 
+This repo is a heavily modified version of env by https://github.com/caarlos0 .  Also major portions we adapted from github.com/joho/godotenv.
 
 ## env utility functions
 
