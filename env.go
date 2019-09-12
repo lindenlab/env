@@ -80,7 +80,7 @@ func doParse(ref reflect.Value, prefix string, funcMap CustomParsers) error {
 	for i := 0; i < refType.NumField(); i++ {
 		refField := ref.Field(i)
 		if reflect.Ptr == refField.Kind() && !refField.IsNil() && refField.CanSet() {
-			err := Parse(refField.Interface())
+			err := ParseWithPrefixFuncs(refField.Interface(), prefix, funcMap)
 			if nil != err {
 				return err
 			}

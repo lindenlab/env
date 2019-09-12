@@ -162,6 +162,17 @@ func TestParsesEnvInner(t *testing.T) {
 	assert.Equal(t, "someinnervalue", cfg.InnerStruct.Inner)
 }
 
+func TestParsesEnvInnerWithPrefix(t *testing.T) {
+	os.Setenv("test_innervar", "someinnervalue")
+	defer os.Clearenv()
+	cfg := ParentStruct{
+		InnerStruct: &InnerStruct{},
+		unexported:  &InnerStruct{},
+	}
+	assert.NoError(t, ParseWithPrefix(&cfg, "test_"))
+	assert.Equal(t, "someinnervalue", cfg.InnerStruct.Inner)
+}
+
 func TestParsesEnvInnerNil(t *testing.T) {
 	os.Setenv("innervar", "someinnervalue")
 	defer os.Clearenv()
@@ -183,6 +194,14 @@ func TestParsesEnvDerived(t *testing.T) {
 	defer os.Clearenv()
 	cfg := DerivedStruct{}
 	assert.NoError(t, Parse(&cfg))
+	assert.Equal(t, "someinnervalue", cfg.Inner)
+}
+
+func TestParsesEnvDerivedWithPrefix(t *testing.T) {
+	os.Setenv("test_innervar", "someinnervalue")
+	defer os.Clearenv()
+	cfg := DerivedStruct{}
+	assert.NoError(t, ParseWithPrefix(&cfg, "test_"))
 	assert.Equal(t, "someinnervalue", cfg.Inner)
 }
 
