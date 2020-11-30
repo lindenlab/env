@@ -610,10 +610,10 @@ func TestCustomParserUint64Alias(t *testing.T) {
 	assert.Equal(t, T(1), cfg.Val)
 }
 
-func TypeCustomParserBasicInvalid(t *testing.T) {
-	type ConstT int32
+func TypeCustomParserBasicInvalid(t *testing.T) { //nolint: unused
+	type ConstT int32 //nolint: unused
 
-	type config struct {
+	type config struct { //nolint: unused
 		Const ConstT `env:"CONST_VAL"`
 	}
 

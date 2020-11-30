@@ -9,7 +9,7 @@ COVER_TARGET ?= 85
 
 LINT_OPTS ?= --fix
 LINTERS=-E gofmt -E govet -E errcheck -E staticcheck -E gosimple -E structcheck \
-        -E varcheck -E ineffassign -E typecheck
+        -E varcheck -E ineffassign -E typecheck -E unused
 
 .PHONEY: build
 build: ${SRCS} 
