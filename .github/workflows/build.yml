@@ -1,0 +1,71 @@
+name: Build ecom-http-utils library
+
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ext-registry.tilia-inc.com/ll-lang/gobuild:1.18.8
+      credentials:
+        username: github
+        password: ${{ secrets.EXT_REGISTRY_PASSWORD }}
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      -
+        name: Ensure Version Bump
+        shell: bash
+        run: |
+          VERSIONS_EXIST=$(for i in $(cat Version); do git tag -l v$i; done)
+          echo "The following versions have been set - ${VERSIONS_EXIST[*]}"
+          if [[ ${GITHUB_REF_NAME} != master ]] && [[ -n "$VERSIONS_EXIST" ]];
+          then echo "Need to update Version file - exiting" && exit 1; fi
+      -
+        name: Go Cache
+        uses: actions/cache@v3
+        with:
+          path: /app/pkg/mod/cache/download
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+      -
+        name: Build
+        shell: bash
+        run: |
+          set -x
+          git config --global url."https://${{ secrets.ECOM_LINDEN_PAT }}@github.com".insteadOf "https://github.com"
+          make cover
+
+          #Clear LINT_OPTS so it does apply fixes
+          export LINT_OPTS=
+          make lint
+
+          make build
+      -
+        name: Tag
+        run: |
+          /sbin/tag.sh Version
+          if [ $? != 0 ]; then exit 1; fi
+      -
+        name: Slack
+        id: drone
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          channel-id: extraction-notify
+          payload: |
+            {
+              "text": "GitHub Action build result: ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "GitHub Action build result: ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.ECOM_SLACK_WEBHOOK_URL }}
