@@ -6,7 +6,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: ext-registry.tilia-inc.com/ll-lang/gobuild:1.18.8
+      image: ext-registry.tilia-inc.com/ll-lang/gobuild:1.20.1
       credentials:
         username: github
         password: ${{ secrets.EXT_REGISTRY_PASSWORD }}
