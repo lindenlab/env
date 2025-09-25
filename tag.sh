@@ -56,7 +56,7 @@ fi
 DEFAULT_BRANCH=$( git remote show $( git config --get remote.origin.url ) | grep 'HEAD branch' | cut -d' ' -f5 )
 echo "Default branch is: $DEFAULT_BRANCH"
 
-if [ "$1" = "check_version" ]; then
+if [ "${1-}" = "check_version" ]; then
     blue "\\nChecking version and verify if we need to update the version file."
     shift
     VERSION_FILES=$*
