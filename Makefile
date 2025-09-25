@@ -8,8 +8,6 @@ VERSION := $(shell cat Version)
 COVER_TARGET ?= 85
 
 LINT_OPTS ?= --fix
-LINTERS=-E gofmt -E govet -E errcheck -E staticcheck -E gosimple -E structcheck \
-        -E varcheck -E ineffassign -E typecheck -E unused
 
 .PHONEY: build
 build: ${SRCS} 
@@ -28,7 +26,7 @@ cover:  ## Generate test coverage results
 
 .PHONY: lint
 lint:  ## Run golint and go fmt on source base
-	@golangci-lint run ${LINT_OPTS} --no-config --disable-all ${LINTERS} ./...
+	@golangci-lint run ${LINT_OPTS} --config .standard-lint.yml ./...
 
 .PHONY: clean
 clean:  ## Clean up any generated files

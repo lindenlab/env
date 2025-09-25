@@ -565,7 +565,7 @@ func TestCustomParserBasicType(t *testing.T) {
 		if err != nil {
 			return nil, err
 		}
-		r := ConstT(i)
+		r := ConstT(i) //nolint:gosec
 		return r, nil
 	}
 
@@ -596,7 +596,7 @@ func TestCustomParserUint64Alias(t *testing.T) {
 		if err != nil {
 			return nil, err
 		}
-		return T(i), nil
+		return T(i), nil //nolint:gosec
 	}
 
 	cfg := config{}
