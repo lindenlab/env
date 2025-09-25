@@ -547,7 +547,7 @@ func TestCustomParserError(t *testing.T) {
 
 	assert.Empty(t, cfg.Var.name, "Var.name should not be filled out when parse errors")
 	assert.Error(t, err)
-	assert.Equal(t, "Custom parser error: something broke", err.Error())
+	assert.Equal(t, "custom parser error: something broke", err.Error())
 }
 
 func TestCustomParserBasicType(t *testing.T) {
@@ -565,7 +565,7 @@ func TestCustomParserBasicType(t *testing.T) {
 		if err != nil {
 			return nil, err
 		}
-		r := ConstT(i)
+		r := ConstT(i) //nolint:gosec
 		return r, nil
 	}
 
@@ -596,7 +596,7 @@ func TestCustomParserUint64Alias(t *testing.T) {
 		if err != nil {
 			return nil, err
 		}
-		return T(i), nil
+		return T(i), nil //nolint:gosec
 	}
 
 	cfg := config{}

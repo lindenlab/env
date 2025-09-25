@@ -15,11 +15,11 @@ import (
 var (
 	// ErrNotAStructPtr is returned if you pass something that is not a pointer to a
 	// Struct to Parse
-	ErrNotAStructPtr = errors.New("Expected a pointer to a Struct")
+	ErrNotAStructPtr = errors.New("expected a pointer to a Struct")
 	// ErrUnsupportedType if the struct field type is not supported by env
-	ErrUnsupportedType = errors.New("Type is not supported")
+	ErrUnsupportedType = errors.New("type is not supported")
 	// ErrUnsupportedSliceType if the slice element type is not supported by env
-	ErrUnsupportedSliceType = errors.New("Unsupported slice type")
+	ErrUnsupportedSliceType = errors.New("unsupported slice type")
 	// OnEnvVarSet is an optional convenience callback, such as for logging purposes.
 	// If not nil, it's called after successfully setting the given field from the given value.
 	OnEnvVarSet func(reflect.StructField, string)
@@ -156,7 +156,7 @@ func set(field reflect.Value, refType reflect.StructField, value string, funcMap
 	if ok {
 		val, err := parserFunc(value)
 		if err != nil {
-			return fmt.Errorf("Custom parser error: %v", err)
+			return fmt.Errorf("custom parser error: %v", err)
 		}
 		field.Set(reflect.ValueOf(val))
 		return nil
@@ -165,7 +165,7 @@ func set(field reflect.Value, refType reflect.StructField, value string, funcMap
 	if refType.Type == reflect.TypeOf(url.URL{}) {
 		u, err := url.Parse(value)
 		if err != nil {
-			return fmt.Errorf("Unable to complete URL parse: %v", err)
+			return fmt.Errorf("unable to complete URL parse: %v", err)
 		}
 		field.Set(reflect.ValueOf(*u))
 		return nil
