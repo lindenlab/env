@@ -1,0 +1,64 @@
+# DO NOT EDIT
+#
+# This wil will be auto-updated by checkdeps to match the version in
+#    extraction-makeworld/configs/checkdeps/standard-lint.yml
+#
+#  If you NEED to have custom lint rules for a paticular repository you can change the name
+#  of this file make your updates.  Then change the lint target in the Makefile to reference your
+#  custom file.
+#
+#  If we need to update this config to add new linters, get rid of deprecated linters, etc.  You can just make
+#  the change in makeworld and then it will propogate to all repos using this file as developers run
+#  checkdeps --fix in those repos.
+
+# yamllint disable rule:line-length
+---
+version: "2"
+linters:
+  default: none
+  enable:
+    - errcheck
+    - gosec
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+  settings:
+    staticcheck:
+      checks:
+        - all
+        # The following are off by default - no opinion on if we agree...
+        - -ST1000
+        - -ST1003
+        - -ST1016
+        - -ST1020
+        - -ST1021
+        - -ST1022
+        # This rule deletes the name of a struct if embedded in another struct.  It makes for less verbose code, but in some cases
+        # if hurts readability as the name of the nested struct can be meaningful.  So keep this rule off.
+        - -QF1008
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/lindenlab
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
