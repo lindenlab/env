@@ -67,32 +67,67 @@ var (
 	sliceOfURLs      = reflect.TypeOf([]url.URL(nil))
 )
 
-// CustomParsers is a friendly name for the type that `ParseWithFuncs()` accepts
+// CustomParsers maps Go types to custom parsing functions.
+// It allows you to provide custom logic for parsing environment variables
+// into specific types that aren't supported by default.
+//
+// The key is the reflect.Type of the target type, and the value is a ParserFunc
+// that knows how to convert a string to that type.
 type CustomParsers map[reflect.Type]ParserFunc
 
-// ParserFunc defines the signature of a function that can be used within `CustomParsers`
+// ParserFunc defines the signature of a custom parsing function.
+// It takes a string value from an environment variable and returns
+// the parsed value as an interface{} and any parsing error.
+//
+// The returned value should be of the type that the parser is designed to handle.
 type ParserFunc func(v string) (interface{}, error)
 
-// Parse parses a struct containing `env` tags and loads its values from
-// environment variables.
+// Parse populates a struct's fields from environment variables.
+// The struct fields must be tagged with `env:"VAR_NAME"` to specify
+// which environment variable to read.
+//
+// Supported struct tags:
+//   - env:"VAR_NAME" - specifies the environment variable name (required)
+//   - envDefault:"value" - default value if the environment variable is not set
+//   - required:"true" - makes the field required (causes error if missing)
+//   - envSeparator:"," - separator for slice types (default is comma)
+//   - envExpand:"true" - enables variable expansion using os.ExpandEnv
+//
+// The function supports nested structs and pointers to structs.
+// It returns an error if required fields are missing or if type conversion fails.
 func Parse(v interface{}) error {
 	return ParseWithPrefixFuncs(v, "", make(map[reflect.Type]ParserFunc))
 }
 
-// ParseWithPrefix parses a struct containing `env` tags and loads its values from
-// environment variables.  The actual env vars looked up include the passed in prefix.
+// ParseWithPrefix populates a struct's fields from environment variables with a prefix.
+// This is useful for loading different configurations for the same struct type.
+//
+// For example, with prefix "CLIENT2_", a field tagged `env:"ENDPOINT"` will
+// read from the environment variable "CLIENT2_ENDPOINT".
+//
+// See Parse for details on supported struct tags and behavior.
 func ParseWithPrefix(v interface{}, prefix string) error {
 	return ParseWithPrefixFuncs(v, prefix, make(map[reflect.Type]ParserFunc))
 }
 
-// ParseWithFuncs is the same as `Parse` except it also allows the user to pass
-// in custom parsers.
+// ParseWithFuncs populates a struct's fields from environment variables,
+// using custom parsing functions for specific types.
+//
+// This allows you to handle types that aren't supported by default.
+// The funcMap parameter maps reflect.Type values to ParserFunc implementations.
+//
+// See Parse for details on supported struct tags and behavior.
 func ParseWithFuncs(v interface{}, funcMap CustomParsers) error {
 	return ParseWithPrefixFuncs(v, "", funcMap)
 }
 
-// ParseWithPrefixFuncs is the same as `ParseWithPrefix` except it also allows the user to pass
-// in custom parsers.
+// ParseWithPrefixFuncs populates a struct's fields from environment variables
+// with both a prefix and custom parsing functions.
+//
+// This combines the functionality of ParseWithPrefix and ParseWithFuncs,
+// allowing both prefixed variable names and custom type parsing.
+//
+// See Parse for details on supported struct tags and behavior.
 func ParseWithPrefixFuncs(v interface{}, prefix string, funcMap CustomParsers) error {
 	ptrRef := reflect.ValueOf(v)
 	if ptrRef.Kind() != reflect.Ptr {
