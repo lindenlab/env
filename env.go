@@ -351,7 +351,7 @@ func parseInt64s(data []string) ([]int64, error) {
 }
 
 func parseUint64s(data []string) ([]uint64, error) {
-	var uintSlice []uint64
+	uintSlice := make([]uint64, 0, len(data))
 
 	for _, v := range data {
 		uintValue, err := strconv.ParseUint(v, 10, 64)
