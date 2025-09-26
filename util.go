@@ -154,7 +154,7 @@ func GetOrFloat32(key string, defaultValue float32) float32 {
 	return defaultValue
 }
 
-// MustGetUFloat32 - get an environment variable or panic if does not exist
+// MustGetFloat32 - get an environment variable or panic if does not exist
 func MustGetFloat32(key string) float32 {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
@@ -186,7 +186,7 @@ func GetOrFloat64(key string, defaultValue float64) float64 {
 	return defaultValue
 }
 
-// MustGetUFloat64 - get an environment variable or panic if does not exist
+// MustGetFloat64 - get an environment variable or panic if does not exist
 func MustGetFloat64(key string) float64 {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
@@ -281,7 +281,7 @@ func GetOrDuration(key string, defaultValue string) time.Duration {
 	}
 	defaultDuration, err := time.ParseDuration(defaultValue)
 	if err != nil {
-		panic(fmt.Sprintf("default duration \"%s\" could not be converted to time.Duration", key))
+		panic(fmt.Sprintf("default duration \"%s\" could not be converted to time.Duration", defaultValue))
 	}
 	return defaultDuration
 }
@@ -317,7 +317,7 @@ func GetOrUrl(key string, defaultValue string) *url.URL {
 	}
 	defaultUrl, err := url.ParseRequestURI(defaultValue)
 	if err != nil {
-		panic(fmt.Sprintf("default duration \"%s\" could not be converted to url.URL", key))
+		panic(fmt.Sprintf("default url \"%s\" could not be converted to url.URL", defaultValue))
 	}
 	return defaultUrl
 }
