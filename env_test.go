@@ -677,7 +677,12 @@ func TestCustomParserBasicUnsupported(t *testing.T) {
 
 	assert.Zero(t, cfg.Const)
 	assert.Error(t, err)
-	assert.Equal(t, ErrUnsupportedType, err)
+	// With the new ParseErrors, single errors are wrapped
+	if parseErrors, ok := err.(ParseErrors); ok && len(parseErrors) == 1 {
+		assert.Equal(t, ErrUnsupportedType, parseErrors[0])
+	} else {
+		assert.Equal(t, ErrUnsupportedType, err)
+	}
 }
 
 func TestUnsupportedStructType(t *testing.T) {
@@ -691,7 +696,12 @@ func TestUnsupportedStructType(t *testing.T) {
 	err := Parse(cfg)
 
 	assert.Error(t, err)
-	assert.Equal(t, ErrUnsupportedType, err)
+	// With the new ParseErrors, single errors are wrapped
+	if parseErrors, ok := err.(ParseErrors); ok && len(parseErrors) == 1 {
+		assert.Equal(t, ErrUnsupportedType, parseErrors[0])
+	} else {
+		assert.Equal(t, ErrUnsupportedType, err)
+	}
 }
 
 func TestTextUnmarshalerError(t *testing.T) {
@@ -714,4 +724,54 @@ func ExampleParse() {
 	_ = Parse(&cfg)
 	fmt.Println(cfg)
 	// Output: {/tmp/fakehome 3000 false}
+}
+
+// Test ParseErrors functionality
+func TestParseErrors(t *testing.T) {
+	// Test empty ParseErrors
+	var emptyErrors ParseErrors
+	assert.Equal(t, "", emptyErrors.Error())
+
+	// Test single error
+	singleErrors := ParseErrors{errors.New("single error")}
+	assert.Equal(t, "single error", singleErrors.Error())
+
+	// Test multiple errors
+	multipleErrors := ParseErrors{
+		errors.New("first error"),
+		errors.New("second error"),
+		errors.New("third error"),
+	}
+	expected := `multiple parsing errors (3):
+  1. first error
+  2. second error
+  3. third error`
+	assert.Equal(t, expected, multipleErrors.Error())
+}
+
+// Test ParseErrors in actual parsing scenario
+func TestParseMultipleErrors(t *testing.T) {
+	type config struct {
+		RequiredVar1 string `env:"REQUIRED_VAR1" required:"true"`
+		RequiredVar2 int    `env:"REQUIRED_VAR2" required:"true"`
+		BadInt       int    `env:"BAD_INT_VAR"`
+	}
+
+	// Set up environment to cause multiple errors
+	os.Unsetenv("REQUIRED_VAR1")
+	os.Unsetenv("REQUIRED_VAR2")
+	os.Setenv("BAD_INT_VAR", "not_a_number")
+
+	cfg := &config{}
+	err := Parse(cfg)
+
+	// Should get a ParseErrors with multiple issues
+	assert.Error(t, err)
+	parseErrors, ok := err.(ParseErrors)
+	assert.True(t, ok, "Error should be of type ParseErrors")
+	assert.Greater(t, len(parseErrors), 1, "Should have multiple errors")
+
+	// Check that error message contains information about multiple errors
+	errMsg := err.Error()
+	assert.Contains(t, errMsg, "multiple parsing errors")
 }

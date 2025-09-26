@@ -4,9 +4,23 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"time"
 )
+
+// Regular expression for validating environment variable names
+// Typically follows pattern: [A-Z_][A-Z0-9_]*
+var envVarNameRegex = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
+
+// isValidEnvVarKey validates that an environment variable key follows standard naming conventions
+// This is a helper function for internal validation - not exported to avoid breaking changes
+func isValidEnvVarKey(key string) bool {
+	if key == "" {
+		return false
+	}
+	return envVarNameRegex.MatchString(key)
+}
 
 // Set - sets an environment variable
 func Set(key, value string) error {
@@ -74,7 +88,7 @@ func MustGetBool(key string) bool {
 
 // GetInt - get an environment variable as int
 func GetInt(key string) (int, error) {
-	value, err := strconv.ParseInt(os.Getenv(key), 10, 32)
+	value, err := strconv.ParseInt(os.Getenv(key), DecimalBase, Int32Bits)
 	return int(value), err
 }
 
@@ -82,7 +96,7 @@ func GetInt(key string) (int, error) {
 func GetOrInt(key string, defaultValue int) int {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
-		value, err := strconv.ParseInt(strValue, 10, 32)
+		value, err := strconv.ParseInt(strValue, DecimalBase, Int32Bits)
 		if err == nil {
 			return int(value)
 		}
@@ -94,7 +108,7 @@ func GetOrInt(key string, defaultValue int) int {
 func MustGetInt(key string) int {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
-		value, err := strconv.ParseInt(strValue, 10, 32)
+		value, err := strconv.ParseInt(strValue, DecimalBase, Int32Bits)
 		if err == nil {
 			return int(value)
 		} else {
@@ -106,7 +120,7 @@ func MustGetInt(key string) int {
 
 // GetUint - get an environment variable as uint
 func GetUint(key string) (uint, error) {
-	value, err := strconv.ParseUint(os.Getenv(key), 10, 32)
+	value, err := strconv.ParseUint(os.Getenv(key), DecimalBase, Int32Bits)
 	return uint(value), err
 }
 
@@ -114,7 +128,7 @@ func GetUint(key string) (uint, error) {
 func GetOrUint(key string, defaultValue uint) uint {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
-		value, err := strconv.ParseUint(strValue, 10, 32)
+		value, err := strconv.ParseUint(strValue, DecimalBase, Int32Bits)
 		if err == nil {
 			return uint(value)
 		}
@@ -126,7 +140,7 @@ func GetOrUint(key string, defaultValue uint) uint {
 func MustGetUint(key string) uint {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
-		value, err := strconv.ParseUint(strValue, 10, 32)
+		value, err := strconv.ParseUint(strValue, DecimalBase, Int32Bits)
 		if err == nil {
 			return uint(value)
 		} else {
@@ -138,7 +152,7 @@ func MustGetUint(key string) uint {
 
 // GetFloat32 - get an environment variable as float32
 func GetFloat32(key string) (float32, error) {
-	value, err := strconv.ParseFloat(os.Getenv(key), 32)
+	value, err := strconv.ParseFloat(os.Getenv(key), Float32Bits)
 	return float32(value), err
 }
 
@@ -146,7 +160,7 @@ func GetFloat32(key string) (float32, error) {
 func GetOrFloat32(key string, defaultValue float32) float32 {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
-		value, err := strconv.ParseFloat(strValue, 32)
+		value, err := strconv.ParseFloat(strValue, Float32Bits)
 		if err == nil {
 			return float32(value)
 		}
@@ -158,7 +172,7 @@ func GetOrFloat32(key string, defaultValue float32) float32 {
 func MustGetFloat32(key string) float32 {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
-		value, err := strconv.ParseFloat(strValue, 32)
+		value, err := strconv.ParseFloat(strValue, Float32Bits)
 		if err == nil {
 			return float32(value)
 		} else {
@@ -170,7 +184,7 @@ func MustGetFloat32(key string) float32 {
 
 // GetFloat64 - get an environment variable as float64
 func GetFloat64(key string) (float64, error) {
-	value, err := strconv.ParseFloat(os.Getenv(key), 64)
+	value, err := strconv.ParseFloat(os.Getenv(key), Float64Bits)
 	return float64(value), err
 }
 
@@ -178,7 +192,7 @@ func GetFloat64(key string) (float64, error) {
 func GetOrFloat64(key string, defaultValue float64) float64 {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
-		value, err := strconv.ParseFloat(strValue, 64)
+		value, err := strconv.ParseFloat(strValue, Float64Bits)
 		if err == nil {
 			return float64(value)
 		}
@@ -190,7 +204,7 @@ func GetOrFloat64(key string, defaultValue float64) float64 {
 func MustGetFloat64(key string) float64 {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
-		value, err := strconv.ParseFloat(strValue, 64)
+		value, err := strconv.ParseFloat(strValue, Float64Bits)
 		if err == nil {
 			return float64(value)
 		} else {
@@ -202,7 +216,7 @@ func MustGetFloat64(key string) float64 {
 
 // GetInt64 - get an environment variable as int64
 func GetInt64(key string) (int64, error) {
-	value, err := strconv.ParseInt(os.Getenv(key), 10, 64)
+	value, err := strconv.ParseInt(os.Getenv(key), DecimalBase, Int64Bits)
 	return int64(value), err
 }
 
@@ -210,7 +224,7 @@ func GetInt64(key string) (int64, error) {
 func GetOrInt64(key string, defaultValue int64) int64 {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
-		value, err := strconv.ParseInt(strValue, 10, 64)
+		value, err := strconv.ParseInt(strValue, DecimalBase, Int64Bits)
 		if err == nil {
 			return int64(value)
 		}
@@ -222,7 +236,7 @@ func GetOrInt64(key string, defaultValue int64) int64 {
 func MustGetInt64(key string) int64 {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
-		value, err := strconv.ParseInt(strValue, 10, 64)
+		value, err := strconv.ParseInt(strValue, DecimalBase, Int64Bits)
 		if err == nil {
 			return int64(value)
 		} else {
@@ -234,7 +248,7 @@ func MustGetInt64(key string) int64 {
 
 // GetUint64 - get an environment variable as uint
 func GetUint64(key string) (uint64, error) {
-	value, err := strconv.ParseUint(os.Getenv(key), 10, 64)
+	value, err := strconv.ParseUint(os.Getenv(key), DecimalBase, Int64Bits)
 	return uint64(value), err
 }
 
@@ -242,7 +256,7 @@ func GetUint64(key string) (uint64, error) {
 func GetOrUint64(key string, defaultValue uint64) uint64 {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
-		value, err := strconv.ParseUint(strValue, 10, 64)
+		value, err := strconv.ParseUint(strValue, DecimalBase, Int64Bits)
 		if err == nil {
 			return uint64(value)
 		}
@@ -254,7 +268,7 @@ func GetOrUint64(key string, defaultValue uint64) uint64 {
 func MustGetUint64(key string) uint64 {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
-		value, err := strconv.ParseUint(strValue, 10, 64)
+		value, err := strconv.ParseUint(strValue, DecimalBase, Int64Bits)
 		if err == nil {
 			return uint64(value)
 		} else {

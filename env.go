@@ -12,6 +12,15 @@ import (
 	"time"
 )
 
+// Constants for parsing operations (shared with util.go)
+const (
+	DecimalBase = 10
+	Int32Bits   = 32
+	Int64Bits   = 64
+	Float32Bits = 32
+	Float64Bits = 64
+)
+
 var (
 	// ErrNotAStructPtr is returned if you pass something that is not a pointer to a
 	// Struct to Parse
@@ -20,6 +29,29 @@ var (
 	ErrUnsupportedType = errors.New("type is not supported")
 	// ErrUnsupportedSliceType if the slice element type is not supported by env
 	ErrUnsupportedSliceType = errors.New("unsupported slice type")
+)
+
+// ParseErrors represents multiple errors that occurred during parsing
+type ParseErrors []error
+
+// Error implements the error interface for ParseErrors
+func (pe ParseErrors) Error() string {
+	if len(pe) == 0 {
+		return ""
+	}
+	if len(pe) == 1 {
+		return pe[0].Error()
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("multiple parsing errors (%d):", len(pe)))
+	for i, err := range pe {
+		sb.WriteString(fmt.Sprintf("\n  %d. %s", i+1, err.Error()))
+	}
+	return sb.String()
+}
+
+var (
 	// OnEnvVarSet is an optional convenience callback, such as for logging purposes.
 	// If not nil, it's called after successfully setting the given field from the given value.
 	OnEnvVarSet func(reflect.StructField, string)
@@ -75,7 +107,7 @@ func ParseWithPrefixFuncs(v interface{}, prefix string, funcMap CustomParsers) e
 
 func doParse(ref reflect.Value, prefix string, funcMap CustomParsers) error {
 	refType := ref.Type()
-	var errorList []string
+	var parseErrors ParseErrors
 
 	for i := 0; i < refType.NumField(); i++ {
 		refField := ref.Field(i)
@@ -89,29 +121,29 @@ func doParse(ref reflect.Value, prefix string, funcMap CustomParsers) error {
 		refTypeField := refType.Field(i)
 		value, err := get(refTypeField, prefix)
 		if err != nil {
-			errorList = append(errorList, err.Error())
+			parseErrors = append(parseErrors, err)
 			continue
 		}
 		if value == "" {
 			if reflect.Struct == refField.Kind() {
 				if err := doParse(refField, prefix, funcMap); err != nil {
-					errorList = append(errorList, err.Error())
+					parseErrors = append(parseErrors, err)
 				}
 			}
 			continue
 		}
 		if err := set(refField, refTypeField, value, funcMap); err != nil {
-			errorList = append(errorList, err.Error())
+			parseErrors = append(parseErrors, err)
 			continue
 		}
 		if OnEnvVarSet != nil {
 			OnEnvVarSet(refTypeField, value)
 		}
 	}
-	if len(errorList) == 0 {
+	if len(parseErrors) == 0 {
 		return nil
 	}
-	return errors.New(strings.Join(errorList, ". "))
+	return parseErrors
 }
 
 func get(field reflect.StructField, prefix string) (string, error) {
@@ -185,25 +217,25 @@ func set(field reflect.Value, refType reflect.StructField, value string, funcMap
 		}
 		field.SetBool(bvalue)
 	case reflect.Int:
-		intValue, err := strconv.ParseInt(value, 10, 32)
+		intValue, err := strconv.ParseInt(value, DecimalBase, Int32Bits)
 		if err != nil {
 			return err
 		}
 		field.SetInt(intValue)
 	case reflect.Uint:
-		uintValue, err := strconv.ParseUint(value, 10, 32)
+		uintValue, err := strconv.ParseUint(value, DecimalBase, Int32Bits)
 		if err != nil {
 			return err
 		}
 		field.SetUint(uintValue)
 	case reflect.Float32:
-		v, err := strconv.ParseFloat(value, 32)
+		v, err := strconv.ParseFloat(value, Float32Bits)
 		if err != nil {
 			return err
 		}
 		field.SetFloat(v)
 	case reflect.Float64:
-		v, err := strconv.ParseFloat(value, 64)
+		v, err := strconv.ParseFloat(value, Float64Bits)
 		if err != nil {
 			return err
 		}
@@ -216,14 +248,14 @@ func set(field reflect.Value, refType reflect.StructField, value string, funcMap
 			}
 			field.Set(reflect.ValueOf(dValue))
 		} else {
-			intValue, err := strconv.ParseInt(value, 10, 64)
+			intValue, err := strconv.ParseInt(value, DecimalBase, Int64Bits)
 			if err != nil {
 				return err
 			}
 			field.SetInt(intValue)
 		}
 	case reflect.Uint64:
-		uintValue, err := strconv.ParseUint(value, 10, 64)
+		uintValue, err := strconv.ParseUint(value, DecimalBase, Int64Bits)
 		if err != nil {
 			return err
 		}
@@ -328,7 +360,7 @@ func parseInts(data []string) ([]int, error) {
 	intSlice := make([]int, 0, len(data))
 
 	for _, v := range data {
-		intValue, err := strconv.ParseInt(v, 10, 32)
+		intValue, err := strconv.ParseInt(v, DecimalBase, Int32Bits)
 		if err != nil {
 			return nil, err
 		}
@@ -341,7 +373,7 @@ func parseInt64s(data []string) ([]int64, error) {
 	intSlice := make([]int64, 0, len(data))
 
 	for _, v := range data {
-		intValue, err := strconv.ParseInt(v, 10, 64)
+		intValue, err := strconv.ParseInt(v, DecimalBase, Int64Bits)
 		if err != nil {
 			return nil, err
 		}
@@ -354,7 +386,7 @@ func parseUint64s(data []string) ([]uint64, error) {
 	uintSlice := make([]uint64, 0, len(data))
 
 	for _, v := range data {
-		uintValue, err := strconv.ParseUint(v, 10, 64)
+		uintValue, err := strconv.ParseUint(v, DecimalBase, Int64Bits)
 		if err != nil {
 			return nil, err
 		}
@@ -367,7 +399,7 @@ func parseFloat32s(data []string) ([]float32, error) {
 	float32Slice := make([]float32, 0, len(data))
 
 	for _, v := range data {
-		data, err := strconv.ParseFloat(v, 32)
+		data, err := strconv.ParseFloat(v, Float32Bits)
 		if err != nil {
 			return nil, err
 		}
@@ -380,7 +412,7 @@ func parseFloat64s(data []string) ([]float64, error) {
 	float64Slice := make([]float64, 0, len(data))
 
 	for _, v := range data {
-		data, err := strconv.ParseFloat(v, 64)
+		data, err := strconv.ParseFloat(v, Float64Bits)
 		if err != nil {
 			return nil, err
 		}
