@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -492,7 +493,7 @@ TEST_VAR8=value8
 TEST_VAR9=value9
 TEST_VAR10=value10`
 
-	err := os.WriteFile(tempFile, []byte(envContent), 0644)
+	err := os.WriteFile(tempFile, []byte(envContent), 0600)
 	if err != nil {
 		b.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -526,7 +527,7 @@ TEST_VAR3=new_value3
 EXISTING_VAR1=overridden1
 EXISTING_VAR2=overridden2`
 
-	err := os.WriteFile(tempFile, []byte(envContent), 0644)
+	err := os.WriteFile(tempFile, []byte(envContent), 0600)
 	if err != nil {
 		b.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -553,7 +554,9 @@ func BenchmarkParseUint64s(b *testing.B) {
 	// Create test data with many uint64 values
 	testData := make([]string, 100)
 	for i := 0; i < 100; i++ {
-		testData[i] = fmt.Sprintf("%d", uint64(i*12345))
+		// Use strconv.Itoa to avoid conversion issues
+		baseVal := i * 12345
+		testData[i] = strconv.Itoa(baseVal)
 	}
 
 	b.ResetTimer()

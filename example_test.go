@@ -98,7 +98,7 @@ DATABASE_NAME=myapp
 DEBUG=true
 LOG_LEVEL=info`
 
-	err := os.WriteFile(".env", []byte(envContent), 0644)
+	err := os.WriteFile(".env", []byte(envContent), 0600)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -184,8 +184,14 @@ func ExampleParseWithPrefix() {
 
 	var client1, client2 ClientConfig
 
-	env.ParseWithPrefix(&client1, "CLIENT1_")
-	env.ParseWithPrefix(&client2, "CLIENT2_")
+	err := env.ParseWithPrefix(&client1, "CLIENT1_")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = env.ParseWithPrefix(&client2, "CLIENT2_")
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	fmt.Printf("Client 1: %s:%d\n", client1.Host, client1.Port)
 	fmt.Printf("Client 2: %s:%d\n", client2.Host, client2.Port)
@@ -201,7 +207,7 @@ REDIS_URL=redis://localhost:6379
 API_KEY=secret123
 DEBUG=true`
 
-	err := os.WriteFile("config.env", []byte(envContent), 0644)
+	err := os.WriteFile("config.env", []byte(envContent), 0600)
 	if err != nil {
 		log.Fatal(err)
 	}

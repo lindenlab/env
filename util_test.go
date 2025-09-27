@@ -281,14 +281,14 @@ func TestEnvVarKeyValidation(t *testing.T) {
 	assert.True(t, isValidEnvVarKey("_"))
 
 	// Invalid keys
-	assert.False(t, isValidEnvVarKey(""))                    // empty
-	assert.False(t, isValidEnvVarKey("123VAR"))              // starts with number
-	assert.False(t, isValidEnvVarKey("my-var"))              // contains hyphen
-	assert.False(t, isValidEnvVarKey("my.var"))              // contains dot
-	assert.False(t, isValidEnvVarKey("my var"))              // contains space
-	assert.False(t, isValidEnvVarKey("myvar"))               // lowercase (by convention)
-	assert.False(t, isValidEnvVarKey("My_Var"))              // mixed case
-	assert.False(t, isValidEnvVarKey("VAR!"))                // special character
+	assert.False(t, isValidEnvVarKey(""))       // empty
+	assert.False(t, isValidEnvVarKey("123VAR")) // starts with number
+	assert.False(t, isValidEnvVarKey("my-var")) // contains hyphen
+	assert.False(t, isValidEnvVarKey("my.var")) // contains dot
+	assert.False(t, isValidEnvVarKey("my var")) // contains space
+	assert.False(t, isValidEnvVarKey("myvar"))  // lowercase (by convention)
+	assert.False(t, isValidEnvVarKey("My_Var")) // mixed case
+	assert.False(t, isValidEnvVarKey("VAR!"))   // special character
 }
 
 // Test constants are properly defined
