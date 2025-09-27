@@ -12,6 +12,7 @@ LINT_OPTS ?= --fix
 .PHONEY: build
 build: ${SRCS} 
 	@go build
+
 .PHONY: tests
 tests:  ## Run test suite
 	@go test -race ${PKGS}

@@ -4,26 +4,135 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"time"
 )
 
-// Set - sets an environment variable
+// Regular expression for validating environment variable names
+// Typically follows pattern: [A-Z_][A-Z0-9_]*
+var envVarNameRegex = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
+
+// isValidEnvVarKey validates that an environment variable key follows standard naming conventions
+// This is a helper function for internal validation - not exported to avoid breaking changes
+func isValidEnvVarKey(key string) bool {
+	if key == "" {
+		return false
+	}
+	return envVarNameRegex.MatchString(key)
+}
+
+// Generic types and functions for reducing code duplication
+
+// Parser is a function type that converts a string value to type T.
+// It is used by the generic parsing functions to provide type-safe
+// conversion from environment variable string values.
+type Parser[T any] func(string) (T, error)
+
+// GetParsed retrieves an environment variable and parses it using the provided parser function.
+// It returns the parsed value and any parsing error. If the environment variable is not set,
+// the parser receives an empty string.
+//
+// This is a generic function that can be used with any type that has a corresponding parser.
+// For common types, use the specific Get* functions which are more convenient.
+func GetParsed[T any](key string, parser Parser[T]) (T, error) {
+	value := os.Getenv(key)
+	return parser(value)
+}
+
+// GetOrParsed retrieves an environment variable and parses it using the provided parser function.
+// If the environment variable is not set or parsing fails, it returns the default value.
+//
+// This function never returns an error; it falls back to the default value on any failure.
+func GetOrParsed[T any](key string, defaultValue T, parser Parser[T]) T {
+	strValue, ok := os.LookupEnv(key)
+	if ok {
+		if value, err := parser(strValue); err == nil {
+			return value
+		}
+	}
+	return defaultValue
+}
+
+// MustGetParsed retrieves an environment variable and parses it using the provided parser function.
+// If the environment variable is not set or parsing fails, it panics with a descriptive message.
+//
+// The typeName parameter is used in panic messages to identify the expected type.
+// Use this function when the environment variable is required for the application to function.
+func MustGetParsed[T any](key string, parser Parser[T], typeName string) T {
+	strValue, ok := os.LookupEnv(key)
+	if ok {
+		if value, err := parser(strValue); err == nil {
+			return value
+		} else {
+			panic(fmt.Sprintf("environment variable \"%s\" could not be converted to %s", key, typeName))
+		}
+	}
+	panic(fmt.Sprintf("expected environment variable \"%s\" does not exist", key))
+}
+
+// Type-specific parser functions
+var (
+	ParseBool = func(s string) (bool, error) {
+		return strconv.ParseBool(s)
+	}
+	ParseInt = func(s string) (int, error) {
+		v, err := strconv.ParseInt(s, DecimalBase, Int32Bits)
+		return int(v), err
+	}
+	ParseUint = func(s string) (uint, error) {
+		v, err := strconv.ParseUint(s, DecimalBase, Int32Bits)
+		return uint(v), err
+	}
+	ParseFloat32 = func(s string) (float32, error) {
+		v, err := strconv.ParseFloat(s, Float32Bits)
+		return float32(v), err
+	}
+	ParseFloat64 = func(s string) (float64, error) {
+		return strconv.ParseFloat(s, Float64Bits)
+	}
+	ParseInt64 = func(s string) (int64, error) {
+		return strconv.ParseInt(s, DecimalBase, Int64Bits)
+	}
+	ParseUint64 = func(s string) (uint64, error) {
+		return strconv.ParseUint(s, DecimalBase, Int64Bits)
+	}
+	ParseDuration = func(s string) (time.Duration, error) {
+		return time.ParseDuration(s)
+	}
+	ParseURL = func(s string) (*url.URL, error) {
+		return url.ParseRequestURI(s)
+	}
+)
+
+// Set sets an environment variable to the specified value.
+// It returns an error if the operation fails.
+//
+// This is a simple wrapper around os.Setenv for consistency with other functions in this package.
 func Set(key, value string) error {
 	return os.Setenv(key, value)
 }
 
-// Unset - unsets an environment variable
+// Unset removes an environment variable.
+// It returns an error if the operation fails.
+//
+// This is a simple wrapper around os.Unsetenv for consistency with other functions in this package.
 func Unset(key string) error {
 	return os.Unsetenv(key)
 }
 
-// Get - get an environment variable, empty string if does not exist
+// Get retrieves the value of an environment variable.
+// If the variable is not set, it returns an empty string.
+//
+// This is a simple wrapper around os.Getenv for consistency with other functions in this package.
 func Get(key string) string {
 	return os.Getenv(key)
 }
 
-// GetOr - get an environment variable or return default value if does not exist
+// GetOr retrieves the value of an environment variable.
+// If the variable is not set, it returns the provided default value.
+//
+// This function distinguishes between unset variables and variables set to empty strings.
 func GetOr(key, defaultValue string) string {
 	value, ok := os.LookupEnv(key)
 	if ok {
@@ -32,7 +141,10 @@ func GetOr(key, defaultValue string) string {
 	return defaultValue
 }
 
-// MustGet - get an environment variable or panic if does not exist
+// MustGet retrieves the value of an environment variable.
+// If the variable is not set, it panics with a descriptive message.
+//
+// Use this function when the environment variable is required for the application to function.
 func MustGet(key string) string {
 	value, ok := os.LookupEnv(key)
 	if ok {
@@ -41,236 +153,153 @@ func MustGet(key string) string {
 	panic(fmt.Sprintf("expected environment variable \"%s\" does not exist", key))
 }
 
-// GetBool - get an environment variable as boolean
+// GetBool retrieves an environment variable and parses it as a boolean.
+// It accepts values like "true", "false", "1", "0", "t", "f", "T", "F", "TRUE", "FALSE" (case-insensitive).
+// Returns the parsed boolean value and any parsing error.
 func GetBool(key string) (bool, error) {
-	return strconv.ParseBool(os.Getenv(key))
+	return GetParsed(key, ParseBool)
 }
 
-// GetOrBool - get an environment variable or return default value if does not exist
+// GetOrBool retrieves an environment variable and parses it as a boolean.
+// If the variable is not set or parsing fails, it returns the default value.
 func GetOrBool(key string, defaultValue bool) bool {
-	strValue, ok := os.LookupEnv(key)
-	if ok {
-		value, err := strconv.ParseBool(strValue)
-		if err == nil {
-			return value
-		}
-	}
-	return defaultValue
+	return GetOrParsed(key, defaultValue, ParseBool)
 }
 
-// MustGetBool - get an environment variable or panic if does not exist
+// MustGetBool retrieves an environment variable and parses it as a boolean.
+// If the variable is not set or parsing fails, it panics.
 func MustGetBool(key string) bool {
-	strValue, ok := os.LookupEnv(key)
-	if ok {
-		value, err := strconv.ParseBool(strValue)
-		if err == nil {
-			return value
-		} else {
-			panic(fmt.Sprintf("environment variable \"%s\" could not be converted to boolean", key))
-		}
-	}
-	panic(fmt.Sprintf("expected environment variable \"%s\" does not exist", key))
+	return MustGetParsed(key, ParseBool, "bool")
 }
 
-// GetInt - get an environment variable as int
+// GetInt retrieves an environment variable and parses it as a signed integer.
+// It accepts decimal integers that fit in the int type (platform-dependent size).
+// Returns the parsed integer value and any parsing error.
 func GetInt(key string) (int, error) {
-	value, err := strconv.ParseInt(os.Getenv(key), 10, 32)
-	return int(value), err
+	return GetParsed(key, ParseInt)
 }
 
-// GetOrInt - get an environment variable or return default value if does not exist
+// GetOrInt retrieves an environment variable and parses it as a signed integer.
+// If the variable is not set or parsing fails, it returns the default value.
 func GetOrInt(key string, defaultValue int) int {
-	strValue, ok := os.LookupEnv(key)
-	if ok {
-		value, err := strconv.ParseInt(strValue, 10, 32)
-		if err == nil {
-			return int(value)
-		}
-	}
-	return defaultValue
+	return GetOrParsed(key, defaultValue, ParseInt)
 }
 
-// MustGetInt - get an environment variable or panic if does not exist
+// MustGetInt retrieves an environment variable and parses it as a signed integer.
+// If the variable is not set or parsing fails, it panics.
 func MustGetInt(key string) int {
-	strValue, ok := os.LookupEnv(key)
-	if ok {
-		value, err := strconv.ParseInt(strValue, 10, 32)
-		if err == nil {
-			return int(value)
-		} else {
-			panic(fmt.Sprintf("environment variable \"%s\" could not be converted to int", key))
-		}
-	}
-	panic(fmt.Sprintf("expected environment variable \"%s\" does not exist", key))
+	return MustGetParsed(key, ParseInt, "int")
 }
 
-// GetUint - get an environment variable as uint
+// GetUint retrieves an environment variable and parses it as an unsigned integer.
+// It accepts non-negative decimal integers that fit in the uint type (platform-dependent size).
+// Returns the parsed unsigned integer value and any parsing error.
 func GetUint(key string) (uint, error) {
-	value, err := strconv.ParseUint(os.Getenv(key), 10, 32)
-	return uint(value), err
+	return GetParsed(key, ParseUint)
 }
 
-// GetOrUint - get an environment variable or return default value if does not exist
+// GetOrUint retrieves an environment variable and parses it as an unsigned integer.
+// If the variable is not set or parsing fails, it returns the default value.
 func GetOrUint(key string, defaultValue uint) uint {
-	strValue, ok := os.LookupEnv(key)
-	if ok {
-		value, err := strconv.ParseUint(strValue, 10, 32)
-		if err == nil {
-			return uint(value)
-		}
-	}
-	return defaultValue
+	return GetOrParsed(key, defaultValue, ParseUint)
 }
 
-// MustGetUint - get an environment variable or panic if does not exist
+// MustGetUint retrieves an environment variable and parses it as an unsigned integer.
+// If the variable is not set or parsing fails, it panics.
 func MustGetUint(key string) uint {
-	strValue, ok := os.LookupEnv(key)
-	if ok {
-		value, err := strconv.ParseUint(strValue, 10, 32)
-		if err == nil {
-			return uint(value)
-		} else {
-			panic(fmt.Sprintf("environment variable \"%s\" could not be converted to uint", key))
-		}
-	}
-	panic(fmt.Sprintf("expected environment variable \"%s\" does not exist", key))
+	return MustGetParsed(key, ParseUint, "uint")
 }
 
-// GetFloat32 - get an environment variable as float32
+// GetFloat32 retrieves an environment variable and parses it as a 32-bit floating point number.
+// It accepts decimal numbers in standard or scientific notation.
+// Returns the parsed float32 value and any parsing error.
 func GetFloat32(key string) (float32, error) {
-	value, err := strconv.ParseFloat(os.Getenv(key), 32)
-	return float32(value), err
+	return GetParsed(key, ParseFloat32)
 }
 
-// GetOrFloat32 - get an environment variable or return default value if does not exist
+// GetOrFloat32 retrieves an environment variable and parses it as a 32-bit floating point number.
+// If the variable is not set or parsing fails, it returns the default value.
 func GetOrFloat32(key string, defaultValue float32) float32 {
-	strValue, ok := os.LookupEnv(key)
-	if ok {
-		value, err := strconv.ParseFloat(strValue, 32)
-		if err == nil {
-			return float32(value)
-		}
-	}
-	return defaultValue
+	return GetOrParsed(key, defaultValue, ParseFloat32)
 }
 
-// MustGetUFloat32 - get an environment variable or panic if does not exist
+// MustGetFloat32 retrieves an environment variable and parses it as a 32-bit floating point number.
+// If the variable is not set or parsing fails, it panics.
 func MustGetFloat32(key string) float32 {
-	strValue, ok := os.LookupEnv(key)
-	if ok {
-		value, err := strconv.ParseFloat(strValue, 32)
-		if err == nil {
-			return float32(value)
-		} else {
-			panic(fmt.Sprintf("environment variable \"%s\" could not be converted to float32", key))
-		}
-	}
-	panic(fmt.Sprintf("expected environment variable \"%s\" does not exist", key))
+	return MustGetParsed(key, ParseFloat32, "float32")
 }
 
-// GetFloat64 - get an environment variable as float64
+// GetFloat64 retrieves an environment variable and parses it as a 64-bit floating point number.
+// It accepts decimal numbers in standard or scientific notation.
+// Returns the parsed float64 value and any parsing error.
 func GetFloat64(key string) (float64, error) {
-	value, err := strconv.ParseFloat(os.Getenv(key), 64)
-	return float64(value), err
+	return GetParsed(key, ParseFloat64)
 }
 
-// GetOrFloat64 - get an environment variable or return default value if does not exist
+// GetOrFloat64 retrieves an environment variable and parses it as a 64-bit floating point number.
+// If the variable is not set or parsing fails, it returns the default value.
 func GetOrFloat64(key string, defaultValue float64) float64 {
-	strValue, ok := os.LookupEnv(key)
-	if ok {
-		value, err := strconv.ParseFloat(strValue, 64)
-		if err == nil {
-			return float64(value)
-		}
-	}
-	return defaultValue
+	return GetOrParsed(key, defaultValue, ParseFloat64)
 }
 
-// MustGetUFloat64 - get an environment variable or panic if does not exist
+// MustGetFloat64 retrieves an environment variable and parses it as a 64-bit floating point number.
+// If the variable is not set or parsing fails, it panics.
 func MustGetFloat64(key string) float64 {
-	strValue, ok := os.LookupEnv(key)
-	if ok {
-		value, err := strconv.ParseFloat(strValue, 64)
-		if err == nil {
-			return float64(value)
-		} else {
-			panic(fmt.Sprintf("environment variable \"%s\" could not be converted to float64", key))
-		}
-	}
-	panic(fmt.Sprintf("expected environment variable \"%s\" does not exist", key))
+	return MustGetParsed(key, ParseFloat64, "float64")
 }
 
-// GetInt64 - get an environment variable as int64
+// GetInt64 retrieves an environment variable and parses it as a 64-bit signed integer.
+// It accepts decimal integers in the range -9223372036854775808 to 9223372036854775807.
+// Returns the parsed int64 value and any parsing error.
 func GetInt64(key string) (int64, error) {
-	value, err := strconv.ParseInt(os.Getenv(key), 10, 64)
-	return int64(value), err
+	return GetParsed(key, ParseInt64)
 }
 
-// GetOrInt64 - get an environment variable or return default value if does not exist
+// GetOrInt64 retrieves an environment variable and parses it as a 64-bit signed integer.
+// If the variable is not set or parsing fails, it returns the default value.
 func GetOrInt64(key string, defaultValue int64) int64 {
-	strValue, ok := os.LookupEnv(key)
-	if ok {
-		value, err := strconv.ParseInt(strValue, 10, 64)
-		if err == nil {
-			return int64(value)
-		}
-	}
-	return defaultValue
+	return GetOrParsed(key, defaultValue, ParseInt64)
 }
 
-// MustGetInt64 - get an environment variable or panic if does not exist
+// MustGetInt64 retrieves an environment variable and parses it as a 64-bit signed integer.
+// If the variable is not set or parsing fails, it panics.
 func MustGetInt64(key string) int64 {
-	strValue, ok := os.LookupEnv(key)
-	if ok {
-		value, err := strconv.ParseInt(strValue, 10, 64)
-		if err == nil {
-			return int64(value)
-		} else {
-			panic(fmt.Sprintf("environment variable \"%s\" could not be converted to int64", key))
-		}
-	}
-	panic(fmt.Sprintf("expected environment variable \"%s\" does not exist", key))
+	return MustGetParsed(key, ParseInt64, "int64")
 }
 
-// GetUint64 - get an environment variable as uint
+// GetUint64 retrieves an environment variable and parses it as a 64-bit unsigned integer.
+// It accepts non-negative decimal integers in the range 0 to 18446744073709551615.
+// Returns the parsed uint64 value and any parsing error.
 func GetUint64(key string) (uint64, error) {
-	value, err := strconv.ParseUint(os.Getenv(key), 10, 64)
-	return uint64(value), err
+	return GetParsed(key, ParseUint64)
 }
 
-// GetOrUint64 - get an environment variable or return default value if does not exist
+// GetOrUint64 retrieves an environment variable and parses it as a 64-bit unsigned integer.
+// If the variable is not set or parsing fails, it returns the default value.
 func GetOrUint64(key string, defaultValue uint64) uint64 {
-	strValue, ok := os.LookupEnv(key)
-	if ok {
-		value, err := strconv.ParseUint(strValue, 10, 64)
-		if err == nil {
-			return uint64(value)
-		}
-	}
-	return defaultValue
+	return GetOrParsed(key, defaultValue, ParseUint64)
 }
 
-// MustGetUint64 - get an environment variable or panic if does not exist
+// MustGetUint64 retrieves an environment variable and parses it as a 64-bit unsigned integer.
+// If the variable is not set or parsing fails, it panics.
 func MustGetUint64(key string) uint64 {
-	strValue, ok := os.LookupEnv(key)
-	if ok {
-		value, err := strconv.ParseUint(strValue, 10, 64)
-		if err == nil {
-			return uint64(value)
-		} else {
-			panic(fmt.Sprintf("environment variable \"%s\" could not be converted to uint64", key))
-		}
-	}
-	panic(fmt.Sprintf("expected environment variable \"%s\" does not exist", key))
+	return MustGetParsed(key, ParseUint64, "uint64")
 }
 
-// GetDuration - get an environment variable as time.Duration
+// GetDuration retrieves an environment variable and parses it as a time.Duration.
+// It accepts duration strings like "5s", "2m30s", "1h", "300ms", etc.
+// See time.ParseDuration for the complete format specification.
+// Returns the parsed duration value and any parsing error.
 func GetDuration(key string) (time.Duration, error) {
-	value, err := time.ParseDuration(os.Getenv(key))
-	return value, err
+	return GetParsed(key, ParseDuration)
 }
 
-// GetOrDuration - get an environment variable or return default value if does not exist
+// GetOrDuration retrieves an environment variable and parses it as a time.Duration.
+// If the variable is not set or parsing fails, it parses and returns the default value.
+// The default value must be a valid duration string, or the function will panic.
+//
+// Note: This function takes a string default value (unlike other GetOr* functions)
+// to maintain backwards compatibility with existing APIs.
 func GetOrDuration(key string, defaultValue string) time.Duration {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
@@ -281,32 +310,30 @@ func GetOrDuration(key string, defaultValue string) time.Duration {
 	}
 	defaultDuration, err := time.ParseDuration(defaultValue)
 	if err != nil {
-		panic(fmt.Sprintf("default duration \"%s\" could not be converted to time.Duration", key))
+		panic(fmt.Sprintf("default duration \"%s\" could not be converted to time.Duration", defaultValue))
 	}
 	return defaultDuration
 }
 
-// MustGetDuration - get an environment variable or panic if does not exist
+// MustGetDuration retrieves an environment variable and parses it as a time.Duration.
+// If the variable is not set or parsing fails, it panics.
 func MustGetDuration(key string) time.Duration {
-	strValue, ok := os.LookupEnv(key)
-	if ok {
-		value, err := time.ParseDuration(strValue)
-		if err == nil {
-			return value
-		} else {
-			panic(fmt.Sprintf("environment variable \"%s\" could not be converted to time.Duration", key))
-		}
-	}
-	panic(fmt.Sprintf("expected environment variable \"%s\" does not exist", key))
+	return MustGetParsed(key, ParseDuration, "time.Duration")
 }
 
-// GetUrl - get an environment variable as url.URL
+// GetUrl retrieves an environment variable and parses it as a URL.
+// It accepts absolute URLs and parses them using url.ParseRequestURI.
+// Returns the parsed *url.URL value and any parsing error.
 func GetUrl(key string) (*url.URL, error) {
-	value, err := url.ParseRequestURI(os.Getenv(key))
-	return value, err
+	return GetParsed(key, ParseURL)
 }
 
-// GetOrUrl - get an environment variable or return default value if does not exist
+// GetOrUrl retrieves an environment variable and parses it as a URL.
+// If the variable is not set or parsing fails, it parses and returns the default value.
+// The default value must be a valid URL string, or the function will panic.
+//
+// Note: This function takes a string default value (unlike other GetOr* functions)
+// to maintain backwards compatibility with existing APIs.
 func GetOrUrl(key string, defaultValue string) *url.URL {
 	strValue, ok := os.LookupEnv(key)
 	if ok {
@@ -317,21 +344,13 @@ func GetOrUrl(key string, defaultValue string) *url.URL {
 	}
 	defaultUrl, err := url.ParseRequestURI(defaultValue)
 	if err != nil {
-		panic(fmt.Sprintf("default duration \"%s\" could not be converted to url.URL", key))
+		panic(fmt.Sprintf("default url \"%s\" could not be converted to url.URL", defaultValue))
 	}
 	return defaultUrl
 }
 
-// MustGetUrl - get an environment variable or panic if does not exist
+// MustGetUrl retrieves an environment variable and parses it as a URL.
+// If the variable is not set or parsing fails, it panics.
 func MustGetUrl(key string) *url.URL {
-	strValue, ok := os.LookupEnv(key)
-	if ok {
-		value, err := url.ParseRequestURI(strValue)
-		if err == nil {
-			return value
-		} else {
-			panic(fmt.Sprintf("environment variable \"%s\" could not be converted to url.URL", key))
-		}
-	}
-	panic(fmt.Sprintf("expected environment variable \"%s\" does not exist", key))
+	return MustGetParsed(key, ParseURL, "url.URL")
 }

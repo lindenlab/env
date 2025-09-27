@@ -13,17 +13,19 @@ import (
 
 const doubleQuoteSpecialChars = "\\\n\r\"!$`"
 
-// Load will read your env file(s) and load them into ENV for this process.
+// Load reads environment variables from .env files and sets them in the current process.
+// If no filenames are provided, it defaults to loading ".env" from the current directory.
 //
-// Call this function as close as possible to the start of your program (ideally in main)
+// Multiple files can be loaded in order:
 //
-// # If you call Load without any args it will default to loading .env in the current path
+//	err := env.Load("base.env", "local.env")
 //
-// You can otherwise tell it which files to load (there can be more than one) like
+// Important: Load will NOT override environment variables that are already set.
+// This allows .env files to provide defaults while respecting existing environment configuration.
+// Use Overload if you need to override existing variables.
 //
-//	err := env.Load("fileone", "filetwo")
-//
-// It's important to note that it WILL NOT OVERRIDE an env variable that already exists - consider the .env file to set dev vars or sensible defaults
+// The function returns an error if any file cannot be read or parsed.
+// Call this early in your program, typically in main().
 func Load(filenames ...string) (err error) {
 	filenames = filenamesOrDefault(filenames)
 
@@ -36,18 +38,17 @@ func Load(filenames ...string) (err error) {
 	return
 }
 
-// MustLoad will read your env file(s) and load them into ENV for this process.
+// MustLoad reads environment variables from .env files and sets them in the current process.
+// If no filenames are provided, it defaults to loading ".env" from the current directory.
 //
-// Call this function as close as possible to the start of your program (ideally in main)
+// This function behaves exactly like Load, except it panics on any error instead of returning it.
+// Use this when .env file loading is critical for your application to function.
 //
-// If you call Load without any args it will default to loading .env in the current path.
-// If there are any errors the function will panic.
+// Multiple files can be loaded in order:
 //
-// You can otherwise tell it which files to load (there can be more than one) like
+//	env.MustLoad("base.env", "local.env")
 //
-//	env.MustLoad("fileone", "filetwo")
-//
-// It's important to note that it WILL NOT OVERRIDE an env variable that already exists - consider the .env file to set dev vars or sensible defaults
+// Like Load, this will NOT override environment variables that are already set.
 func MustLoad(filenames ...string) {
 	filenames = filenamesOrDefault(filenames)
 
@@ -59,17 +60,18 @@ func MustLoad(filenames ...string) {
 	}
 }
 
-// Overload will read your env file(s) and load them into ENV for this process.
+// Overload reads environment variables from .env files and sets them in the current process,
+// overriding any existing environment variables.
+// If no filenames are provided, it defaults to loading ".env" from the current directory.
 //
-// Call this function as close as possible to the start of your program (ideally in main)
+// Unlike Load, this function WILL override environment variables that are already set.
+// Use this when you want .env files to take precedence over existing environment configuration.
 //
-// # If you call Overload without any args it will default to loading .env in the current path
+// Multiple files can be loaded in order:
 //
-// You can otherwise tell it which files to load (there can be more than one) like
+//	err := env.Overload("base.env", "production.env")
 //
-//	err := env.Overload("fileone", "filetwo")
-//
-// It's important to note this WILL OVERRIDE an env variable that already exists - consider the .env file to forcefilly set all vars.
+// The function returns an error if any file cannot be read or parsed.
 func Overload(filenames ...string) (err error) {
 	filenames = filenamesOrDefault(filenames)
 
@@ -82,17 +84,16 @@ func Overload(filenames ...string) (err error) {
 	return
 }
 
-// MustOverload will read your env file(s) and load them into ENV for this process.
+// MustOverload reads environment variables from .env files and sets them in the current process,
+// overriding any existing environment variables.
+// If no filenames are provided, it defaults to loading ".env" from the current directory.
 //
-// Call this function as close as possible to the start of your program (ideally in main)
+// This function behaves exactly like Overload, except it panics on any error instead of returning it.
+// Use this when .env file loading is critical and should override existing configuration.
 //
-// # If you call Overload without any args it will default to loading .env in the current path
+// Multiple files can be loaded in order:
 //
-// You can otherwise tell it which files to load (there can be more than one) like
-//
-//	env.MustOverload("fileone", "filetwo")
-//
-// It's important to note this WILL OVERRIDE an env variable that already exists - consider the .env file to forcefilly set all vars.
+//	env.MustOverload("base.env", "production.env")
 func MustOverload(filenames ...string) {
 	filenames = filenamesOrDefault(filenames)
 
@@ -104,8 +105,20 @@ func MustOverload(filenames ...string) {
 	}
 }
 
-// Read all env (with same file loading semantics as Load) but return values as
-// a map rather than automatically writing values into env
+// Read parses .env files and returns the key-value pairs as a map,
+// without setting them as environment variables in the current process.
+//
+// This is useful when you want to inspect or manipulate the values before
+// applying them, or when you want to use the values in a different way.
+// If no filenames are provided, it defaults to reading ".env" from the current directory.
+//
+// Multiple files can be read, with later files overriding earlier ones:
+//
+//	envMap, err := env.Read("base.env", "local.env")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	fmt.Printf("DATABASE_URL=%s\n", envMap["DATABASE_URL"])
 func Read(filenames ...string) (envMap map[string]string, err error) {
 	filenames = filenamesOrDefault(filenames)
 	envMap = make(map[string]string)
@@ -126,7 +139,17 @@ func Read(filenames ...string) (envMap map[string]string, err error) {
 	return
 }
 
-// ParseIO reads an env file from io.Reader, returning a map of keys and values.
+// ParseIO reads environment variables from an io.Reader in .env format.
+// It parses the content and returns a map of key-value pairs.
+//
+// This function supports the standard .env file format including:
+//   - Comments (lines starting with #)
+//   - Quoted values (both single and double quotes)
+//   - Variable expansion (${VAR} and $VAR syntax)
+//   - Multiline values
+//   - Both KEY=value and KEY: value formats
+//
+// It does not set any environment variables; it only parses and returns the data.
 func ParseIO(r io.Reader) (envMap map[string]string, err error) {
 	envMap = make(map[string]string)
 
@@ -154,12 +177,20 @@ func ParseIO(r io.Reader) (envMap map[string]string, err error) {
 	return
 }
 
-// Unmarshal reads an env file from a string, returning a map of keys and values.
+// Unmarshal parses environment variables from a string in .env format.
+// It returns a map of key-value pairs without setting any environment variables.
+//
+// This is a convenience function that wraps ParseIO with a strings.NewReader.
+// See ParseIO for details on the supported .env file format.
 func Unmarshal(str string) (envMap map[string]string, err error) {
 	return ParseIO(strings.NewReader(str))
 }
 
-// Write serializes the given environment and writes it to a file
+// Write serializes a map of environment variables to a .env file.
+// The output file will contain KEY="VALUE" pairs, one per line,
+// with keys sorted alphabetically and values properly escaped.
+//
+// This function will create or overwrite the specified file.
 func Write(envMap map[string]string, filename string) error {
 	content, error := Marshal(envMap)
 	if error != nil {
@@ -173,8 +204,11 @@ func Write(envMap map[string]string, filename string) error {
 	return err
 }
 
-// Marshal outputs the given environment as a dotenv-formatted environment file.
-// Each line is in the format: KEY="VALUE" where VALUE is backslash-escaped.
+// Marshal converts a map of environment variables to .env file format.
+// It returns a string with KEY="VALUE" pairs, one per line,
+// with keys sorted alphabetically and values properly escaped with backslashes.
+//
+// This function does not write to any file; use Write to save the output to disk.
 func Marshal(envMap map[string]string) (string, error) {
 	lines := make([]string, 0, len(envMap))
 	for k, v := range envMap {
@@ -197,15 +231,8 @@ func loadFile(filename string, overload bool) error {
 		return err
 	}
 
-	currentEnv := map[string]bool{}
-	rawEnv := os.Environ()
-	for _, rawEnvLine := range rawEnv {
-		key := strings.Split(rawEnvLine, "=")[0]
-		currentEnv[key] = true
-	}
-
 	for key, value := range envMap {
-		if !currentEnv[key] || overload {
+		if _, exists := os.LookupEnv(key); !exists || overload {
 			os.Setenv(key, value)
 		}
 	}

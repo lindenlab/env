@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -474,5 +475,95 @@ func TestRoundtrip(t *testing.T) {
 			t.Errorf("Expected '%s' to roundtrip as '%v', got '%v' instead", fixtureFilename, env, roundtripped)
 		}
 
+	}
+}
+
+// Benchmark tests for performance improvements
+func BenchmarkLoadFile(b *testing.B) {
+	// Create a temporary .env file for benchmarking
+	tempFile := "benchmark_test.env"
+	envContent := `TEST_VAR1=value1
+TEST_VAR2=value2
+TEST_VAR3=value3
+TEST_VAR4=value4
+TEST_VAR5=value5
+TEST_VAR6=value6
+TEST_VAR7=value7
+TEST_VAR8=value8
+TEST_VAR9=value9
+TEST_VAR10=value10`
+
+	err := os.WriteFile(tempFile, []byte(envContent), 0600)
+	if err != nil {
+		b.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tempFile)
+
+	// Set some existing environment variables to test the lookup optimization
+	os.Setenv("EXISTING_VAR1", "existing1")
+	os.Setenv("EXISTING_VAR2", "existing2")
+	os.Setenv("EXISTING_VAR3", "existing3")
+	defer func() {
+		os.Unsetenv("EXISTING_VAR1")
+		os.Unsetenv("EXISTING_VAR2")
+		os.Unsetenv("EXISTING_VAR3")
+	}()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := loadFile(tempFile, false)
+		if err != nil {
+			b.Fatalf("loadFile failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkLoadFileWithOverload(b *testing.B) {
+	// Create a temporary .env file for benchmarking
+	tempFile := "benchmark_overload_test.env"
+	envContent := `TEST_VAR1=new_value1
+TEST_VAR2=new_value2
+TEST_VAR3=new_value3
+EXISTING_VAR1=overridden1
+EXISTING_VAR2=overridden2`
+
+	err := os.WriteFile(tempFile, []byte(envContent), 0600)
+	if err != nil {
+		b.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tempFile)
+
+	// Set some existing environment variables
+	os.Setenv("EXISTING_VAR1", "original1")
+	os.Setenv("EXISTING_VAR2", "original2")
+	defer func() {
+		os.Unsetenv("EXISTING_VAR1")
+		os.Unsetenv("EXISTING_VAR2")
+	}()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := loadFile(tempFile, true)
+		if err != nil {
+			b.Fatalf("loadFile with overload failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkParseUint64s(b *testing.B) {
+	// Create test data with many uint64 values
+	testData := make([]string, 100)
+	for i := 0; i < 100; i++ {
+		// Use strconv.Itoa to avoid conversion issues
+		baseVal := i * 12345
+		testData[i] = strconv.Itoa(baseVal)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := parseUint64s(testData)
+		if err != nil {
+			b.Fatalf("parseUint64s failed: %v", err)
+		}
 	}
 }

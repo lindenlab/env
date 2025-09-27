@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  pull_request:
 
 jobs:
   create-tag:
@@ -21,5 +22,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Run tag script
-        run: ./tag.sh
+      - name: Ensure version bump
+        run: |
+          .github/workflows/tag.sh check_version $(find . -name "Version" -or -name "Versions") || (echo 'Version Bump Required' >> $FAIL_REASON;exit 1) && exit 0
+
+      - name: Tag this release
+        run: |
+          .github/workflows/tag.sh $(find . -name "Version" -or -name "Versions" | cut -d/ -f2-) || (echo 'Failed to tag' >> $FAIL_REASON;exit 1) && exit 0

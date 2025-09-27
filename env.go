@@ -12,6 +12,15 @@ import (
 	"time"
 )
 
+// Constants for parsing operations (shared with util.go)
+const (
+	DecimalBase = 10
+	Int32Bits   = 32
+	Int64Bits   = 64
+	Float32Bits = 32
+	Float64Bits = 64
+)
+
 var (
 	// ErrNotAStructPtr is returned if you pass something that is not a pointer to a
 	// Struct to Parse
@@ -20,6 +29,29 @@ var (
 	ErrUnsupportedType = errors.New("type is not supported")
 	// ErrUnsupportedSliceType if the slice element type is not supported by env
 	ErrUnsupportedSliceType = errors.New("unsupported slice type")
+)
+
+// ParseErrors represents multiple errors that occurred during parsing
+type ParseErrors []error
+
+// Error implements the error interface for ParseErrors
+func (pe ParseErrors) Error() string {
+	if len(pe) == 0 {
+		return ""
+	}
+	if len(pe) == 1 {
+		return pe[0].Error()
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("multiple parsing errors (%d):", len(pe)))
+	for i, err := range pe {
+		sb.WriteString(fmt.Sprintf("\n  %d. %s", i+1, err.Error()))
+	}
+	return sb.String()
+}
+
+var (
 	// OnEnvVarSet is an optional convenience callback, such as for logging purposes.
 	// If not nil, it's called after successfully setting the given field from the given value.
 	OnEnvVarSet func(reflect.StructField, string)
@@ -35,32 +67,67 @@ var (
 	sliceOfURLs      = reflect.TypeOf([]url.URL(nil))
 )
 
-// CustomParsers is a friendly name for the type that `ParseWithFuncs()` accepts
+// CustomParsers maps Go types to custom parsing functions.
+// It allows you to provide custom logic for parsing environment variables
+// into specific types that aren't supported by default.
+//
+// The key is the reflect.Type of the target type, and the value is a ParserFunc
+// that knows how to convert a string to that type.
 type CustomParsers map[reflect.Type]ParserFunc
 
-// ParserFunc defines the signature of a function that can be used within `CustomParsers`
+// ParserFunc defines the signature of a custom parsing function.
+// It takes a string value from an environment variable and returns
+// the parsed value as an interface{} and any parsing error.
+//
+// The returned value should be of the type that the parser is designed to handle.
 type ParserFunc func(v string) (interface{}, error)
 
-// Parse parses a struct containing `env` tags and loads its values from
-// environment variables.
+// Parse populates a struct's fields from environment variables.
+// The struct fields must be tagged with `env:"VAR_NAME"` to specify
+// which environment variable to read.
+//
+// Supported struct tags:
+//   - env:"VAR_NAME" - specifies the environment variable name (required)
+//   - envDefault:"value" - default value if the environment variable is not set
+//   - required:"true" - makes the field required (causes error if missing)
+//   - envSeparator:"," - separator for slice types (default is comma)
+//   - envExpand:"true" - enables variable expansion using os.ExpandEnv
+//
+// The function supports nested structs and pointers to structs.
+// It returns an error if required fields are missing or if type conversion fails.
 func Parse(v interface{}) error {
 	return ParseWithPrefixFuncs(v, "", make(map[reflect.Type]ParserFunc))
 }
 
-// ParseWithPrefix parses a struct containing `env` tags and loads its values from
-// environment variables.  The actual env vars looked up include the passed in prefix.
+// ParseWithPrefix populates a struct's fields from environment variables with a prefix.
+// This is useful for loading different configurations for the same struct type.
+//
+// For example, with prefix "CLIENT2_", a field tagged `env:"ENDPOINT"` will
+// read from the environment variable "CLIENT2_ENDPOINT".
+//
+// See Parse for details on supported struct tags and behavior.
 func ParseWithPrefix(v interface{}, prefix string) error {
 	return ParseWithPrefixFuncs(v, prefix, make(map[reflect.Type]ParserFunc))
 }
 
-// ParseWithFuncs is the same as `Parse` except it also allows the user to pass
-// in custom parsers.
+// ParseWithFuncs populates a struct's fields from environment variables,
+// using custom parsing functions for specific types.
+//
+// This allows you to handle types that aren't supported by default.
+// The funcMap parameter maps reflect.Type values to ParserFunc implementations.
+//
+// See Parse for details on supported struct tags and behavior.
 func ParseWithFuncs(v interface{}, funcMap CustomParsers) error {
 	return ParseWithPrefixFuncs(v, "", funcMap)
 }
 
-// ParseWithPrefixFuncs is the same as `ParseWithPrefix` except it also allows the user to pass
-// in custom parsers.
+// ParseWithPrefixFuncs populates a struct's fields from environment variables
+// with both a prefix and custom parsing functions.
+//
+// This combines the functionality of ParseWithPrefix and ParseWithFuncs,
+// allowing both prefixed variable names and custom type parsing.
+//
+// See Parse for details on supported struct tags and behavior.
 func ParseWithPrefixFuncs(v interface{}, prefix string, funcMap CustomParsers) error {
 	ptrRef := reflect.ValueOf(v)
 	if ptrRef.Kind() != reflect.Ptr {
@@ -75,7 +142,7 @@ func ParseWithPrefixFuncs(v interface{}, prefix string, funcMap CustomParsers) e
 
 func doParse(ref reflect.Value, prefix string, funcMap CustomParsers) error {
 	refType := ref.Type()
-	var errorList []string
+	var parseErrors ParseErrors
 
 	for i := 0; i < refType.NumField(); i++ {
 		refField := ref.Field(i)
@@ -89,29 +156,29 @@ func doParse(ref reflect.Value, prefix string, funcMap CustomParsers) error {
 		refTypeField := refType.Field(i)
 		value, err := get(refTypeField, prefix)
 		if err != nil {
-			errorList = append(errorList, err.Error())
+			parseErrors = append(parseErrors, err)
 			continue
 		}
 		if value == "" {
 			if reflect.Struct == refField.Kind() {
 				if err := doParse(refField, prefix, funcMap); err != nil {
-					errorList = append(errorList, err.Error())
+					parseErrors = append(parseErrors, err)
 				}
 			}
 			continue
 		}
 		if err := set(refField, refTypeField, value, funcMap); err != nil {
-			errorList = append(errorList, err.Error())
+			parseErrors = append(parseErrors, err)
 			continue
 		}
 		if OnEnvVarSet != nil {
 			OnEnvVarSet(refTypeField, value)
 		}
 	}
-	if len(errorList) == 0 {
+	if len(parseErrors) == 0 {
 		return nil
 	}
-	return errors.New(strings.Join(errorList, ". "))
+	return parseErrors
 }
 
 func get(field reflect.StructField, prefix string) (string, error) {
@@ -185,25 +252,25 @@ func set(field reflect.Value, refType reflect.StructField, value string, funcMap
 		}
 		field.SetBool(bvalue)
 	case reflect.Int:
-		intValue, err := strconv.ParseInt(value, 10, 32)
+		intValue, err := strconv.ParseInt(value, DecimalBase, Int32Bits)
 		if err != nil {
 			return err
 		}
 		field.SetInt(intValue)
 	case reflect.Uint:
-		uintValue, err := strconv.ParseUint(value, 10, 32)
+		uintValue, err := strconv.ParseUint(value, DecimalBase, Int32Bits)
 		if err != nil {
 			return err
 		}
 		field.SetUint(uintValue)
 	case reflect.Float32:
-		v, err := strconv.ParseFloat(value, 32)
+		v, err := strconv.ParseFloat(value, Float32Bits)
 		if err != nil {
 			return err
 		}
 		field.SetFloat(v)
 	case reflect.Float64:
-		v, err := strconv.ParseFloat(value, 64)
+		v, err := strconv.ParseFloat(value, Float64Bits)
 		if err != nil {
 			return err
 		}
@@ -216,14 +283,14 @@ func set(field reflect.Value, refType reflect.StructField, value string, funcMap
 			}
 			field.Set(reflect.ValueOf(dValue))
 		} else {
-			intValue, err := strconv.ParseInt(value, 10, 64)
+			intValue, err := strconv.ParseInt(value, DecimalBase, Int64Bits)
 			if err != nil {
 				return err
 			}
 			field.SetInt(intValue)
 		}
 	case reflect.Uint64:
-		uintValue, err := strconv.ParseUint(value, 10, 64)
+		uintValue, err := strconv.ParseUint(value, DecimalBase, Int64Bits)
 		if err != nil {
 			return err
 		}
@@ -328,7 +395,7 @@ func parseInts(data []string) ([]int, error) {
 	intSlice := make([]int, 0, len(data))
 
 	for _, v := range data {
-		intValue, err := strconv.ParseInt(v, 10, 32)
+		intValue, err := strconv.ParseInt(v, DecimalBase, Int32Bits)
 		if err != nil {
 			return nil, err
 		}
@@ -341,7 +408,7 @@ func parseInt64s(data []string) ([]int64, error) {
 	intSlice := make([]int64, 0, len(data))
 
 	for _, v := range data {
-		intValue, err := strconv.ParseInt(v, 10, 64)
+		intValue, err := strconv.ParseInt(v, DecimalBase, Int64Bits)
 		if err != nil {
 			return nil, err
 		}
@@ -351,10 +418,10 @@ func parseInt64s(data []string) ([]int64, error) {
 }
 
 func parseUint64s(data []string) ([]uint64, error) {
-	var uintSlice []uint64
+	uintSlice := make([]uint64, 0, len(data))
 
 	for _, v := range data {
-		uintValue, err := strconv.ParseUint(v, 10, 64)
+		uintValue, err := strconv.ParseUint(v, DecimalBase, Int64Bits)
 		if err != nil {
 			return nil, err
 		}
@@ -367,7 +434,7 @@ func parseFloat32s(data []string) ([]float32, error) {
 	float32Slice := make([]float32, 0, len(data))
 
 	for _, v := range data {
-		data, err := strconv.ParseFloat(v, 32)
+		data, err := strconv.ParseFloat(v, Float32Bits)
 		if err != nil {
 			return nil, err
 		}
@@ -380,7 +447,7 @@ func parseFloat64s(data []string) ([]float64, error) {
 	float64Slice := make([]float64, 0, len(data))
 
 	for _, v := range data {
-		data, err := strconv.ParseFloat(v, 64)
+		data, err := strconv.ParseFloat(v, Float64Bits)
 		if err != nil {
 			return nil, err
 		}

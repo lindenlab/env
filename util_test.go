@@ -269,3 +269,33 @@ func TestUrlFuncs(t *testing.T) {
 	assert.Equal(t, "google.com", GetOrUrl("BAD_URL", "http://google.com").Hostname())
 	assert.Panics(t, func() { MustGetUrl("BAD_URL") }, "The code did not panic")
 }
+
+// Test environment variable key validation
+func TestEnvVarKeyValidation(t *testing.T) {
+	// Valid keys
+	assert.True(t, isValidEnvVarKey("TEST_VAR"))
+	assert.True(t, isValidEnvVarKey("_PRIVATE_VAR"))
+	assert.True(t, isValidEnvVarKey("VAR123"))
+	assert.True(t, isValidEnvVarKey("MY_APP_CONFIG"))
+	assert.True(t, isValidEnvVarKey("A"))
+	assert.True(t, isValidEnvVarKey("_"))
+
+	// Invalid keys
+	assert.False(t, isValidEnvVarKey(""))       // empty
+	assert.False(t, isValidEnvVarKey("123VAR")) // starts with number
+	assert.False(t, isValidEnvVarKey("my-var")) // contains hyphen
+	assert.False(t, isValidEnvVarKey("my.var")) // contains dot
+	assert.False(t, isValidEnvVarKey("my var")) // contains space
+	assert.False(t, isValidEnvVarKey("myvar"))  // lowercase (by convention)
+	assert.False(t, isValidEnvVarKey("My_Var")) // mixed case
+	assert.False(t, isValidEnvVarKey("VAR!"))   // special character
+}
+
+// Test constants are properly defined
+func TestParsingConstants(t *testing.T) {
+	assert.Equal(t, 10, DecimalBase)
+	assert.Equal(t, 32, Int32Bits)
+	assert.Equal(t, 64, Int64Bits)
+	assert.Equal(t, 32, Float32Bits)
+	assert.Equal(t, 64, Float64Bits)
+}
