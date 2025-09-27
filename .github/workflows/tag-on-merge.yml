@@ -24,8 +24,8 @@ jobs:
 
       - name: Ensure version bump
         run: |
-          ./tag.sh check_version $(find . -name "Version" -or -name "Versions") || (echo 'Version Bump Required' >> $FAIL_REASON;exit 1) && exit 0
+          .github/workflows/tag.sh check_version $(find . -name "Version" -or -name "Versions") || (echo 'Version Bump Required' >> $FAIL_REASON;exit 1) && exit 0
 
       - name: Tag this release
         run: |
-          ./tag.sh $(find . -name "Version" -or -name "Versions" | cut -d/ -f2-) || (echo 'Failed to tag' >> $FAIL_REASON;exit 1) && exit 0
+          .github/workflows/tag.sh $(find . -name "Version" -or -name "Versions" | cut -d/ -f2-) || (echo 'Failed to tag' >> $FAIL_REASON;exit 1) && exit 0
