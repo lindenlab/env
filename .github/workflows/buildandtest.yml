@@ -7,6 +7,21 @@ on:
     branches: [ main ]
 
 jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: lindenlab/check-tag-action@v1
+        with:
+          mode: check
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          args: --config .standard-lint.yml ./...
+
   build-and-test:
     runs-on: ubuntu-latest
     steps:
