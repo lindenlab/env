@@ -7,10 +7,27 @@ on:
     branches: [ main ]
 
 jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: lindenlab/check-tag-action@v1
+        with:
+          mode: check
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          args: --config .standard-lint.yml ./...
+
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -22,3 +39,11 @@ jobs:
 
     - name: Test
       run: make cover
+
+  tag-release:
+    needs: [check-version, lint, build-and-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: lindenlab/check-tag-action@v1
+        with:
+          mode: tag

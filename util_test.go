@@ -299,3 +299,141 @@ func TestParsingConstants(t *testing.T) {
 	assert.Equal(t, 32, Float32Bits)
 	assert.Equal(t, 64, Float64Bits)
 }
+
+// Test MustGetWithContext
+func TestMustGetWithContext(t *testing.T) {
+	os.Setenv("TEST_VAR", "test_value")
+	defer os.Unsetenv("TEST_VAR")
+
+	// Should work when env var exists
+	val := MustGetWithContext("TEST_VAR", "testing purposes")
+	assert.Equal(t, "test_value", val)
+
+	// Should panic with context when env var doesn't exist
+	assert.PanicsWithValue(t, "required env var MISSING_VAR missing (needed for: database connection)", func() {
+		MustGetWithContext("MISSING_VAR", "database connection")
+	})
+}
+
+// Mock test helper for testing
+type mockTestHelper struct {
+	cleanupFuncs []func()
+}
+
+func (m *mockTestHelper) Helper() {}
+
+func (m *mockTestHelper) Cleanup(f func()) {
+	m.cleanupFuncs = append(m.cleanupFuncs, f)
+}
+
+// Test SetForTest
+func TestSetForTest(t *testing.T) {
+	// Test setting a new variable
+	t.Run("set new variable", func(t *testing.T) {
+		os.Unsetenv("TEST_VAR")
+		mock := &mockTestHelper{}
+
+		cleanup := SetForTest(mock, "TEST_VAR", "test_value")
+
+		// Verify it's set
+		val, exists := os.LookupEnv("TEST_VAR")
+		assert.True(t, exists)
+		assert.Equal(t, "test_value", val)
+
+		// Call cleanup
+		cleanup()
+
+		// Verify it's removed
+		_, exists = os.LookupEnv("TEST_VAR")
+		assert.False(t, exists)
+
+		// Verify cleanup was registered
+		assert.Len(t, mock.cleanupFuncs, 1)
+	})
+
+	// Test overwriting an existing variable
+	t.Run("overwrite existing variable", func(t *testing.T) {
+		os.Setenv("TEST_VAR", "original")
+		defer os.Unsetenv("TEST_VAR")
+
+		mock := &mockTestHelper{}
+		cleanup := SetForTest(mock, "TEST_VAR", "new_value")
+
+		// Verify it's changed
+		val, _ := os.LookupEnv("TEST_VAR")
+		assert.Equal(t, "new_value", val)
+
+		// Call cleanup
+		cleanup()
+
+		// Verify it's restored
+		val, exists := os.LookupEnv("TEST_VAR")
+		assert.True(t, exists)
+		assert.Equal(t, "original", val)
+	})
+
+	// Test without test helper
+	t.Run("without test helper", func(t *testing.T) {
+		os.Unsetenv("TEST_VAR")
+
+		cleanup := SetForTest(nil, "TEST_VAR", "test_value")
+
+		// Verify it's set
+		val, exists := os.LookupEnv("TEST_VAR")
+		assert.True(t, exists)
+		assert.Equal(t, "test_value", val)
+
+		// Call cleanup
+		cleanup()
+
+		// Verify it's removed
+		_, exists = os.LookupEnv("TEST_VAR")
+		assert.False(t, exists)
+	})
+}
+
+// Test UnsetForTest
+func TestUnsetForTest(t *testing.T) {
+	// Test unsetting an existing variable
+	t.Run("unset existing variable", func(t *testing.T) {
+		os.Setenv("TEST_VAR", "test_value")
+		defer os.Unsetenv("TEST_VAR")
+
+		mock := &mockTestHelper{}
+		cleanup := UnsetForTest(mock, "TEST_VAR")
+
+		// Verify it's unset
+		_, exists := os.LookupEnv("TEST_VAR")
+		assert.False(t, exists)
+
+		// Call cleanup
+		cleanup()
+
+		// Verify it's restored
+		val, exists := os.LookupEnv("TEST_VAR")
+		assert.True(t, exists)
+		assert.Equal(t, "test_value", val)
+
+		// Verify cleanup was registered
+		assert.Len(t, mock.cleanupFuncs, 1)
+	})
+
+	// Test unsetting a non-existent variable
+	t.Run("unset non-existent variable", func(t *testing.T) {
+		os.Unsetenv("TEST_VAR")
+
+		mock := &mockTestHelper{}
+		cleanup := UnsetForTest(mock, "TEST_VAR")
+
+		// Verify it's still unset
+		_, exists := os.LookupEnv("TEST_VAR")
+		assert.False(t, exists)
+
+		// Call cleanup (should not restore anything)
+		cleanup()
+
+		// Verify it's still unset
+		_, exists = os.LookupEnv("TEST_VAR")
+		assert.False(t, exists)
+	})
+}

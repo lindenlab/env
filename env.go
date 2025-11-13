@@ -55,6 +55,10 @@ var (
 	// OnEnvVarSet is an optional convenience callback, such as for logging purposes.
 	// If not nil, it's called after successfully setting the given field from the given value.
 	OnEnvVarSet func(reflect.StructField, string)
+	// DebugLogger is an optional function for logging configuration parsing details.
+	// If not nil, it's called with debug messages during Parse operations.
+	// Use EnableDebugLogging to set this conveniently.
+	DebugLogger func(format string, args ...interface{})
 	// Friendly names for reflect types
 	sliceOfInts      = reflect.TypeOf([]int(nil))
 	sliceOfInt64s    = reflect.TypeOf([]int64(nil))
@@ -105,8 +109,13 @@ func Parse(v interface{}) error {
 // For example, with prefix "CLIENT2_", a field tagged `env:"ENDPOINT"` will
 // read from the environment variable "CLIENT2_ENDPOINT".
 //
+// The prefix must end with an underscore if it's not empty, otherwise an error is returned.
+//
 // See Parse for details on supported struct tags and behavior.
 func ParseWithPrefix(v interface{}, prefix string) error {
+	if prefix != "" && !strings.HasSuffix(prefix, "_") {
+		return fmt.Errorf("prefix must end with underscore, got: %q", prefix)
+	}
 	return ParseWithPrefixFuncs(v, prefix, make(map[reflect.Type]ParserFunc))
 }
 
@@ -127,8 +136,13 @@ func ParseWithFuncs(v interface{}, funcMap CustomParsers) error {
 // This combines the functionality of ParseWithPrefix and ParseWithFuncs,
 // allowing both prefixed variable names and custom type parsing.
 //
+// The prefix must end with an underscore if it's not empty, otherwise an error is returned.
+//
 // See Parse for details on supported struct tags and behavior.
 func ParseWithPrefixFuncs(v interface{}, prefix string, funcMap CustomParsers) error {
+	if prefix != "" && !strings.HasSuffix(prefix, "_") {
+		return fmt.Errorf("prefix must end with underscore, got: %q", prefix)
+	}
 	ptrRef := reflect.ValueOf(v)
 	if ptrRef.Kind() != reflect.Ptr {
 		return ErrNotAStructPtr
@@ -137,15 +151,24 @@ func ParseWithPrefixFuncs(v interface{}, prefix string, funcMap CustomParsers) e
 	if ref.Kind() != reflect.Struct {
 		return ErrNotAStructPtr
 	}
-	return doParse(ref, prefix, funcMap)
+	structType := ref.Type()
+	return doParse(ref, structType, "", prefix, funcMap)
 }
 
-func doParse(ref reflect.Value, prefix string, funcMap CustomParsers) error {
+func doParse(ref reflect.Value, structType reflect.Type, fieldPath string, prefix string, funcMap CustomParsers) error {
 	refType := ref.Type()
 	var parseErrors ParseErrors
 
 	for i := 0; i < refType.NumField(); i++ {
 		refField := ref.Field(i)
+		refTypeField := refType.Field(i)
+
+		// Build the field path for better error messages
+		currentPath := refTypeField.Name
+		if fieldPath != "" {
+			currentPath = fieldPath + "." + currentPath
+		}
+
 		if reflect.Ptr == refField.Kind() && !refField.IsNil() && refField.CanSet() {
 			err := ParseWithPrefixFuncs(refField.Interface(), prefix, funcMap)
 			if nil != err {
@@ -153,24 +176,34 @@ func doParse(ref reflect.Value, prefix string, funcMap CustomParsers) error {
 			}
 			continue
 		}
-		refTypeField := refType.Field(i)
+
 		value, err := get(refTypeField, prefix)
 		if err != nil {
-			parseErrors = append(parseErrors, err)
+			// Enhance error message with field context
+			parseErrors = append(parseErrors, fmt.Errorf("field '%s' in %s: %w", currentPath, structType.Name(), err))
 			continue
 		}
 		if value == "" {
 			if reflect.Struct == refField.Kind() {
-				if err := doParse(refField, prefix, funcMap); err != nil {
+				nestedStructType := refField.Type()
+				if err := doParse(refField, nestedStructType, currentPath, prefix, funcMap); err != nil {
 					parseErrors = append(parseErrors, err)
 				}
 			}
 			continue
 		}
 		if err := set(refField, refTypeField, value, funcMap); err != nil {
-			parseErrors = append(parseErrors, err)
+			// Enhance error message with field context
+			parseErrors = append(parseErrors, fmt.Errorf("field '%s' in %s: %w", currentPath, structType.Name(), err))
 			continue
 		}
+
+		// Debug logging if enabled
+		if DebugLogger != nil {
+			envKey := prefix + refTypeField.Tag.Get("env")
+			DebugLogger("env: %s = %s (field: %s.%s)", envKey, value, structType.Name(), currentPath)
+		}
+
 		if OnEnvVarSet != nil {
 			OnEnvVarSet(refTypeField, value)
 		}
@@ -522,4 +555,193 @@ func parseTextUnmarshalers(field reflect.Value, data []string) error {
 	field.Set(slice)
 
 	return nil
+}
+
+// EnableDebugLogging enables debug logging for configuration parsing.
+// The provided logger function will be called with debug messages during Parse operations.
+//
+// This is useful for debugging configuration issues, especially in production where
+// you want to see what environment variables are being read and their values.
+//
+// Example usage:
+//
+//	env.EnableDebugLogging(log.Printf)
+//	cfg := &Config{}
+//	env.Parse(&cfg) // Will log each env var as it's read
+//
+// To disable debug logging, call env.EnableDebugLogging(nil).
+func EnableDebugLogging(logger func(format string, args ...interface{})) {
+	DebugLogger = logger
+}
+
+// VarInfo contains information about an environment variable used by a struct field.
+type VarInfo struct {
+	// Name is the full environment variable name (including any prefix)
+	Name string
+	// FieldName is the struct field name
+	FieldName string
+	// FieldPath is the full path to the field (for nested structs)
+	FieldPath string
+	// Required indicates if the environment variable is required
+	Required bool
+	// Default is the default value if the environment variable is not set
+	Default string
+	// Type is the Go type of the field
+	Type string
+	// HasDefault indicates if a default value is specified
+	HasDefault bool
+}
+
+// GetAllVars returns information about all environment variables that would be read
+// when parsing the given struct. This includes both required and optional variables.
+//
+// The prefix parameter is prepended to all environment variable names.
+//
+// This function is useful for:
+//   - Generating documentation
+//   - Creating example .env files
+//   - Debugging configuration issues
+//   - Validating that all expected variables are set
+//
+// Example usage:
+//
+//	vars := env.GetAllVars(&Config{}, "")
+//	for _, v := range vars {
+//	    fmt.Printf("%s: %s (required: %v, default: %s)\n",
+//	        v.Name, v.Type, v.Required, v.Default)
+//	}
+func GetAllVars(v interface{}, prefix string) ([]VarInfo, error) {
+	ptrRef := reflect.ValueOf(v)
+	if ptrRef.Kind() != reflect.Ptr {
+		return nil, ErrNotAStructPtr
+	}
+	ref := ptrRef.Elem()
+	if ref.Kind() != reflect.Struct {
+		return nil, ErrNotAStructPtr
+	}
+
+	var vars []VarInfo
+	collectVars(ref, ref.Type(), "", prefix, &vars)
+	return vars, nil
+}
+
+// GetRequiredVars returns the names of all required environment variables
+// that would be read when parsing the given struct.
+//
+// The prefix parameter is prepended to all environment variable names.
+//
+// This function is useful for validating that all required variables are set
+// before attempting to parse the configuration.
+//
+// Example usage:
+//
+//	required := env.GetRequiredVars(&Config{}, "")
+//	for _, name := range required {
+//	    if _, ok := os.LookupEnv(name); !ok {
+//	        log.Fatalf("Required environment variable %s is not set", name)
+//	    }
+//	}
+func GetRequiredVars(v interface{}, prefix string) ([]string, error) {
+	allVars, err := GetAllVars(v, prefix)
+	if err != nil {
+		return nil, err
+	}
+
+	var required []string
+	for _, v := range allVars {
+		if v.Required {
+			required = append(required, v.Name)
+		}
+	}
+	return required, nil
+}
+
+// ValidateRequired checks if all required environment variables for the given struct are set.
+// It does not parse the values, only checks for their existence.
+//
+// This is useful for validating configuration at startup before attempting to parse,
+// which can provide clearer error messages.
+//
+// Example usage:
+//
+//	if err := env.ValidateRequired(&Config{}, ""); err != nil {
+//	    log.Fatalf("Configuration validation failed: %v", err)
+//	}
+//	// Now safe to parse
+//	env.Parse(&cfg)
+func ValidateRequired(v interface{}, prefix string) error {
+	requiredVars, err := GetRequiredVars(v, prefix)
+	if err != nil {
+		return err
+	}
+
+	var missingVars []string
+	for _, name := range requiredVars {
+		if _, ok := os.LookupEnv(name); !ok {
+			missingVars = append(missingVars, name)
+		}
+	}
+
+	if len(missingVars) > 0 {
+		return fmt.Errorf("missing required environment variables: %v", missingVars)
+	}
+	return nil
+}
+
+func collectVars(ref reflect.Value, structType reflect.Type, fieldPath string, prefix string, vars *[]VarInfo) {
+	refType := ref.Type()
+
+	for i := 0; i < refType.NumField(); i++ {
+		refField := ref.Field(i)
+		refTypeField := refType.Field(i)
+
+		// Build the field path
+		currentPath := refTypeField.Name
+		if fieldPath != "" {
+			currentPath = fieldPath + "." + currentPath
+		}
+
+		// Get the env tag
+		envTag := refTypeField.Tag.Get("env")
+		if envTag == "" {
+			// No env tag, check if it's a nested struct
+			if refField.Kind() == reflect.Struct {
+				collectVars(refField, refField.Type(), currentPath, prefix, vars)
+			}
+			continue
+		}
+
+		// Parse required tag
+		required := false
+		if reqTag := refTypeField.Tag.Get("required"); reqTag != "" {
+			if b, err := strconv.ParseBool(reqTag); err == nil {
+				required = b
+			}
+		}
+
+		// Get default value
+		defaultValue := refTypeField.Tag.Get("envDefault")
+		hasDefault := defaultValue != ""
+
+		// Get the full env var name
+		fullName := prefix + envTag
+
+		// Get the type name
+		typeName := refTypeField.Type.String()
+
+		*vars = append(*vars, VarInfo{
+			Name:       fullName,
+			FieldName:  refTypeField.Name,
+			FieldPath:  currentPath,
+			Required:   required,
+			Default:    defaultValue,
+			Type:       typeName,
+			HasDefault: hasDefault,
+		})
+
+		// Check for nested structs
+		if refField.Kind() == reflect.Struct {
+			collectVars(refField, refField.Type(), currentPath, prefix, vars)
+		}
+	}
 }

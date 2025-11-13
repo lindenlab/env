@@ -153,6 +153,22 @@ func MustGet(key string) string {
 	panic(fmt.Sprintf("expected environment variable \"%s\" does not exist", key))
 }
 
+// MustGetWithContext retrieves the value of an environment variable with additional context.
+// If the variable is not set, it panics with a descriptive message that includes the context.
+//
+// The context parameter should describe why this variable is needed, making errors more helpful.
+// For example: "generating wallet URIs" or "connecting to database".
+//
+// Use this function when the environment variable is required and you want to provide
+// additional context in error messages.
+func MustGetWithContext(key, context string) string {
+	value, ok := os.LookupEnv(key)
+	if ok {
+		return value
+	}
+	panic(fmt.Sprintf("required env var %s missing (needed for: %s)", key, context))
+}
+
 // GetBool retrieves an environment variable and parses it as a boolean.
 // It accepts values like "true", "false", "1", "0", "t", "f", "T", "F", "TRUE", "FALSE" (case-insensitive).
 // Returns the parsed boolean value and any parsing error.
@@ -353,4 +369,82 @@ func GetOrUrl(key string, defaultValue string) *url.URL {
 // If the variable is not set or parsing fails, it panics.
 func MustGetUrl(key string) *url.URL {
 	return MustGetParsed(key, ParseURL, "url.URL")
+}
+
+// TestHelper is an interface that represents a testing object (typically *testing.T or *testing.B).
+// It provides the minimal interface needed for test helper functions.
+type TestHelper interface {
+	Helper()
+	Cleanup(func())
+}
+
+// SetForTest sets an environment variable for testing and automatically cleans it up.
+// It returns a cleanup function that can be called manually, though cleanup is also
+// registered with t.Cleanup() if t is non-nil.
+//
+// If the environment variable already exists, it will be restored to its original value.
+// If it doesn't exist, it will be removed during cleanup.
+//
+// Example usage:
+//
+//	func TestConfig(t *testing.T) {
+//	    cleanup := env.SetForTest(t, "WALLET_TRANSACTION_API", "https://test.com")
+//	    defer cleanup() // Optional: cleanup is also registered with t.Cleanup()
+//	    // test code
+//	}
+func SetForTest(t TestHelper, key, value string) func() {
+	if t != nil {
+		t.Helper()
+	}
+
+	old, existed := os.LookupEnv(key)
+	os.Setenv(key, value)
+
+	cleanup := func() {
+		if existed {
+			os.Setenv(key, old)
+		} else {
+			os.Unsetenv(key)
+		}
+	}
+
+	if t != nil {
+		t.Cleanup(cleanup)
+	}
+
+	return cleanup
+}
+
+// UnsetForTest removes an environment variable for testing and automatically restores it.
+// It returns a cleanup function that can be called manually, though cleanup is also
+// registered with t.Cleanup() if t is non-nil.
+//
+// If the environment variable exists, it will be restored to its original value during cleanup.
+//
+// Example usage:
+//
+//	func TestWithoutEnv(t *testing.T) {
+//	    cleanup := env.UnsetForTest(t, "OPTIONAL_CONFIG")
+//	    defer cleanup()
+//	    // test code that expects the variable to not exist
+//	}
+func UnsetForTest(t TestHelper, key string) func() {
+	if t != nil {
+		t.Helper()
+	}
+
+	old, existed := os.LookupEnv(key)
+	os.Unsetenv(key)
+
+	cleanup := func() {
+		if existed {
+			os.Setenv(key, old)
+		}
+	}
+
+	if t != nil {
+		t.Cleanup(cleanup)
+	}
+
+	return cleanup
 }
