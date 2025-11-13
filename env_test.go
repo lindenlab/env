@@ -812,10 +812,10 @@ func TestPrefixValidation(t *testing.T) {
 // Test GetAllVars
 func TestGetAllVars(t *testing.T) {
 	type config struct {
-		Required string `env:"REQUIRED" required:"true"`
-		Optional string `env:"OPTIONAL"`
+		Required    string `env:"REQUIRED" required:"true"`
+		Optional    string `env:"OPTIONAL"`
 		WithDefault string `env:"WITH_DEFAULT" envDefault:"default_value"`
-		Number int `env:"NUMBER" required:"true"`
+		Number      int    `env:"NUMBER" required:"true"`
 	}
 
 	vars, err := GetAllVars(&config{}, "")
@@ -863,8 +863,8 @@ func TestGetAllVarsWithPrefix(t *testing.T) {
 func TestGetRequiredVars(t *testing.T) {
 	type config struct {
 		Required1 string `env:"REQUIRED1" required:"true"`
-		Optional string `env:"OPTIONAL"`
-		Required2 int `env:"REQUIRED2" required:"true"`
+		Optional  string `env:"OPTIONAL"`
+		Required2 int    `env:"REQUIRED2" required:"true"`
 	}
 
 	required, err := GetRequiredVars(&config{}, "")
@@ -879,8 +879,8 @@ func TestGetRequiredVars(t *testing.T) {
 func TestValidateRequired(t *testing.T) {
 	type config struct {
 		Required1 string `env:"REQUIRED1" required:"true"`
-		Optional string `env:"OPTIONAL"`
-		Required2 int `env:"REQUIRED2" required:"true"`
+		Optional  string `env:"OPTIONAL"`
+		Required2 int    `env:"REQUIRED2" required:"true"`
 	}
 
 	// All required vars set
@@ -935,7 +935,7 @@ func TestGetAllVarsNested(t *testing.T) {
 
 	type Config struct {
 		TopValue string `env:"TOP_VALUE"`
-		Nested NestedConfig
+		Nested   NestedConfig
 	}
 
 	vars, err := GetAllVars(&Config{}, "")
