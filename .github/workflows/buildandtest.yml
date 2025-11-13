@@ -17,6 +17,8 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v5
+
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
@@ -37,3 +39,11 @@ jobs:
 
     - name: Test
       run: make cover
+
+  tag-release:
+    needs: [check-version, lint, build-and-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: lindenlab/check-tag-action@v1
+        with:
+          mode: tag
