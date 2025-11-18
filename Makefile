@@ -1,6 +1,5 @@
 PKGS := $(shell go list ./... | grep -v -E mocks)
 SRCS := $(shell find . go.mod -name '*.go') go.mod
-export GO111MODULE=on
 
 VERSION := $(shell cat Version)
 

@@ -456,7 +456,9 @@ func TestErrorRequiredNotValid(t *testing.T) {
 	cfg := &config{}
 	err := Parse(cfg)
 	assert.Error(t, err)
-	assert.Equal(t, err.Error(), "invalid required tag \"cat\": strconv.ParseBool: parsing \"cat\": invalid syntax")
+	// Error now includes field context
+	assert.Contains(t, err.Error(), "invalid required tag \"cat\"")
+	assert.Contains(t, err.Error(), "field 'IsRequired'")
 }
 
 func TestParseExpandOption(t *testing.T) {
@@ -547,7 +549,9 @@ func TestCustomParserError(t *testing.T) {
 
 	assert.Empty(t, cfg.Var.name, "Var.name should not be filled out when parse errors")
 	assert.Error(t, err)
-	assert.Equal(t, "custom parser error: something broke", err.Error())
+	// Error message now includes field context
+	assert.Contains(t, err.Error(), "custom parser error: something broke")
+	assert.Contains(t, err.Error(), "field 'Var'")
 }
 
 func TestCustomParserBasicType(t *testing.T) {
@@ -677,11 +681,12 @@ func TestCustomParserBasicUnsupported(t *testing.T) {
 
 	assert.Zero(t, cfg.Const)
 	assert.Error(t, err)
-	// With the new ParseErrors, single errors are wrapped
+	// Error now includes field context and wraps the original error
 	if parseErrors, ok := err.(ParseErrors); ok && len(parseErrors) == 1 {
-		assert.Equal(t, ErrUnsupportedType, parseErrors[0])
+		assert.ErrorIs(t, parseErrors[0], ErrUnsupportedType)
+		assert.Contains(t, parseErrors[0].Error(), "field 'Const'")
 	} else {
-		assert.Equal(t, ErrUnsupportedType, err)
+		t.Fatal("Expected ParseErrors")
 	}
 }
 
@@ -696,11 +701,12 @@ func TestUnsupportedStructType(t *testing.T) {
 	err := Parse(cfg)
 
 	assert.Error(t, err)
-	// With the new ParseErrors, single errors are wrapped
+	// Error now includes field context and wraps the original error
 	if parseErrors, ok := err.(ParseErrors); ok && len(parseErrors) == 1 {
-		assert.Equal(t, ErrUnsupportedType, parseErrors[0])
+		assert.ErrorIs(t, parseErrors[0], ErrUnsupportedType)
+		assert.Contains(t, parseErrors[0].Error(), "field 'Foo'")
 	} else {
-		assert.Equal(t, ErrUnsupportedType, err)
+		t.Fatal("Expected ParseErrors")
 	}
 }
 
@@ -774,4 +780,184 @@ func TestParseMultipleErrors(t *testing.T) {
 	// Check that error message contains information about multiple errors
 	errMsg := err.Error()
 	assert.Contains(t, errMsg, "multiple parsing errors")
+}
+
+// Test prefix validation
+func TestPrefixValidation(t *testing.T) {
+	type config struct {
+		Value string `env:"VALUE"`
+	}
+
+	os.Setenv("TEST_VALUE", "test")
+	defer os.Unsetenv("TEST_VALUE")
+
+	// Valid prefix (ends with underscore)
+	cfg := &config{}
+	err := ParseWithPrefix(cfg, "TEST_")
+	assert.NoError(t, err)
+	assert.Equal(t, "test", cfg.Value)
+
+	// Empty prefix is valid
+	cfg = &config{}
+	err = ParseWithPrefix(cfg, "")
+	assert.NoError(t, err)
+
+	// Invalid prefix (doesn't end with underscore)
+	cfg = &config{}
+	err = ParseWithPrefix(cfg, "TEST")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "prefix must end with underscore")
+}
+
+// Test GetAllVars
+func TestGetAllVars(t *testing.T) {
+	type config struct {
+		Required    string `env:"REQUIRED" required:"true"`
+		Optional    string `env:"OPTIONAL"`
+		WithDefault string `env:"WITH_DEFAULT" envDefault:"default_value"`
+		Number      int    `env:"NUMBER" required:"true"`
+	}
+
+	vars, err := GetAllVars(&config{}, "")
+	assert.NoError(t, err)
+	assert.Len(t, vars, 4)
+
+	// Check required field
+	requiredVar := findVar(vars, "REQUIRED")
+	assert.NotNil(t, requiredVar)
+	assert.True(t, requiredVar.Required)
+	assert.Equal(t, "Required", requiredVar.FieldName)
+	assert.Equal(t, "string", requiredVar.Type)
+
+	// Check optional field
+	optionalVar := findVar(vars, "OPTIONAL")
+	assert.NotNil(t, optionalVar)
+	assert.False(t, optionalVar.Required)
+
+	// Check field with default
+	defaultVar := findVar(vars, "WITH_DEFAULT")
+	assert.NotNil(t, defaultVar)
+	assert.True(t, defaultVar.HasDefault)
+	assert.Equal(t, "default_value", defaultVar.Default)
+
+	// Check number field
+	numberVar := findVar(vars, "NUMBER")
+	assert.NotNil(t, numberVar)
+	assert.True(t, numberVar.Required)
+	assert.Equal(t, "int", numberVar.Type)
+}
+
+// Test GetAllVars with prefix
+func TestGetAllVarsWithPrefix(t *testing.T) {
+	type config struct {
+		Value string `env:"VALUE"`
+	}
+
+	vars, err := GetAllVars(&config{}, "PREFIX_")
+	assert.NoError(t, err)
+	assert.Len(t, vars, 1)
+	assert.Equal(t, "PREFIX_VALUE", vars[0].Name)
+}
+
+// Test GetRequiredVars
+func TestGetRequiredVars(t *testing.T) {
+	type config struct {
+		Required1 string `env:"REQUIRED1" required:"true"`
+		Optional  string `env:"OPTIONAL"`
+		Required2 int    `env:"REQUIRED2" required:"true"`
+	}
+
+	required, err := GetRequiredVars(&config{}, "")
+	assert.NoError(t, err)
+	assert.Len(t, required, 2)
+	assert.Contains(t, required, "REQUIRED1")
+	assert.Contains(t, required, "REQUIRED2")
+	assert.NotContains(t, required, "OPTIONAL")
+}
+
+// Test ValidateRequired
+func TestValidateRequired(t *testing.T) {
+	type config struct {
+		Required1 string `env:"REQUIRED1" required:"true"`
+		Optional  string `env:"OPTIONAL"`
+		Required2 int    `env:"REQUIRED2" required:"true"`
+	}
+
+	// All required vars set
+	os.Setenv("REQUIRED1", "value1")
+	os.Setenv("REQUIRED2", "42")
+	defer os.Unsetenv("REQUIRED1")
+	defer os.Unsetenv("REQUIRED2")
+
+	err := ValidateRequired(&config{}, "")
+	assert.NoError(t, err)
+
+	// Missing required var
+	os.Unsetenv("REQUIRED1")
+	err = ValidateRequired(&config{}, "")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "missing required environment variables")
+	assert.Contains(t, err.Error(), "REQUIRED1")
+}
+
+// Test EnableDebugLogging
+func TestEnableDebugLogging(t *testing.T) {
+	type config struct {
+		Value string `env:"TEST_VALUE"`
+	}
+
+	os.Setenv("TEST_VALUE", "test")
+	defer os.Unsetenv("TEST_VALUE")
+
+	var logMessages []string
+	logger := func(format string, args ...interface{}) {
+		logMessages = append(logMessages, fmt.Sprintf(format, args...))
+	}
+
+	EnableDebugLogging(logger)
+	defer EnableDebugLogging(nil) // Clean up
+
+	cfg := &config{}
+	err := Parse(cfg)
+	assert.NoError(t, err)
+
+	// Verify debug logging was called
+	assert.NotEmpty(t, logMessages)
+	assert.Contains(t, logMessages[0], "TEST_VALUE")
+	assert.Contains(t, logMessages[0], "test")
+}
+
+// Test nested structs with GetAllVars
+func TestGetAllVarsNested(t *testing.T) {
+	type NestedConfig struct {
+		NestedValue string `env:"NESTED_VALUE"`
+	}
+
+	type Config struct {
+		TopValue string `env:"TOP_VALUE"`
+		Nested   NestedConfig
+	}
+
+	vars, err := GetAllVars(&Config{}, "")
+	assert.NoError(t, err)
+	assert.Len(t, vars, 2)
+
+	topVar := findVar(vars, "TOP_VALUE")
+	assert.NotNil(t, topVar)
+	assert.Equal(t, "TopValue", topVar.FieldName)
+
+	nestedVar := findVar(vars, "NESTED_VALUE")
+	assert.NotNil(t, nestedVar)
+	assert.Equal(t, "NestedValue", nestedVar.FieldName)
+	assert.Contains(t, nestedVar.FieldPath, "Nested")
+}
+
+// Helper function to find a var by name
+func findVar(vars []VarInfo, name string) *VarInfo {
+	for _, v := range vars {
+		if v.Name == name {
+			return &v
+		}
+	}
+	return nil
 }
